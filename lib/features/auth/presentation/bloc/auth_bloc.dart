@@ -1,0 +1,169 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:equatable/equatable.dart';
+import 'package:task_app/core/services/connectivity_service.dart';
+import 'package:task_app/core/services/local_storage_service.dart';
+import 'package:task_app/core/usecase/usecase.dart';
+import 'package:task_app/core/utils/error_mapper.dart';
+import 'package:task_app/features/auth/domain/entities/user_entity.dart';
+import 'package:task_app/features/auth/domain/usecases/signup_usecase.dart';
+import 'package:task_app/features/auth/domain/usecases/signin_usecase.dart';
+import 'package:task_app/features/auth/domain/usecases/auth_usecases.dart';
+
+part 'auth_event.dart';
+part 'auth_state.dart';
+
+class AuthBloc extends Bloc<AuthEvent, AuthState> {
+  final SignUpWithEmailAndPassword _signUpWithEmailAndPassword;
+  final SignInWithEmailAndPassword _signInWithEmailAndPassword;
+  final GetCurrentUser _getCurrentUser;
+  final SignOut _signOut;
+  final ConnectivityService _connectivityService;
+  final LocalStorageService _localStorageService;
+
+  AuthBloc({
+    required SignUpWithEmailAndPassword signUpWithEmailAndPassword,
+    required SignInWithEmailAndPassword signInWithEmailAndPassword,
+    required GetCurrentUser getCurrentUser,
+    required SignOut signOut,
+    required ConnectivityService connectivityService,
+    required LocalStorageService localStorageService,
+  })  : _signUpWithEmailAndPassword = signUpWithEmailAndPassword,
+        _signInWithEmailAndPassword = signInWithEmailAndPassword,
+        _getCurrentUser = getCurrentUser,
+        _signOut = signOut,
+        _connectivityService = connectivityService,
+        _localStorageService = localStorageService,
+        super(AuthInitial()) {
+    on<SignUpRequested>(_onSignUpRequested);
+    on<SignInRequested>(_onSignInRequested);
+    on<CheckAuthStatusRequested>(_onCheckAuthStatusRequested);
+    on<SignOutRequested>(_onSignOutRequested);
+  }
+
+  // Friendly error mapping moved to core/utils/error_mapper.dart
+
+  Future<void> _onSignUpRequested(
+    SignUpRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+
+    // Check connectivity
+    final isConnected = await _connectivityService.checkConnectivity();
+    if (!isConnected) {
+      emit(const AuthError('Check your internet connectivity'));
+      return;
+    }
+
+    final result = await _signUpWithEmailAndPassword(
+      SignUpParams(
+        userName: event.userName,
+        email: event.email,
+        password: event.password,
+      ),
+    );
+
+    await result.fold(
+      (failure) async {
+        emit(AuthError(authFriendlyMessage(failure.message)));
+      },
+      (user) async {
+        await _localStorageService.cacheUser(user);
+        emit(AuthSuccess(user));
+      },
+    );
+  }
+
+  Future<void> _onSignInRequested(
+    SignInRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+
+    // Check connectivity
+    final isConnected = await _connectivityService.checkConnectivity();
+    if (!isConnected) {
+      emit(const AuthError('Check your internet connectivity'));
+      return;
+    }
+
+    final result = await _signInWithEmailAndPassword(
+      SignInParams(
+        email: event.email,
+        password: event.password,
+      ),
+    );
+
+    await result.fold(
+      (failure) async {
+        emit(AuthError(authFriendlyMessage(failure.message)));
+      },
+      (user) async {
+        await _localStorageService.cacheUser(user);
+        emit(AuthSuccess(user));
+      },
+    );
+  }
+
+  Future<void> _onCheckAuthStatusRequested(
+    CheckAuthStatusRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+
+    final isLoggedIn = await _localStorageService.isUserLoggedIn();
+    
+    if (isLoggedIn) {
+      final cachedUser = await _localStorageService.getCachedUser();
+      if (cachedUser != null) {
+        final isConnected = await _connectivityService.checkConnectivity();
+        
+        if (isConnected) {
+          // Try to get current user from Firebase
+          final result = await _getCurrentUser(NoParams());
+          await result.fold(
+            (failure) async {
+              emit(AuthOffline(cachedUser));
+            },
+            (user) async {
+              await _localStorageService.cacheUser(user);
+              emit(AuthAuthenticated(user));
+            },
+          );
+        } else {
+          // Offline mode with cached user
+          emit(AuthOffline(cachedUser));
+        }
+      } else {
+        emit(AuthUnauthenticated());
+      }
+    } else {
+      emit(AuthUnauthenticated());
+    }
+  }
+
+  Future<void> _onSignOutRequested(
+    SignOutRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    // Clear local storage first
+    await _localStorageService.logout();
+
+    // Sign out from Firebase (if connected)
+    final isConnected = await _connectivityService.checkConnectivity();
+    if (isConnected) {
+      final result = await _signOut(NoParams());
+      result.fold(
+        (failure) {
+          // Even if Firebase sign out fails, we've cleared local storage
+          emit(AuthUnauthenticated());
+        },
+        (_) {
+          emit(AuthUnauthenticated());
+        },
+      );
+    } else {
+      emit(AuthUnauthenticated());
+    }
+  }
+}

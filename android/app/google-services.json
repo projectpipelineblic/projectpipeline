@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "288891668667",
+    "project_id": "projectpipeline-f89c4",
+    "storage_bucket": "projectpipeline-f89c4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:288891668667:android:4827a02d8729017d3d419e",
+        "android_client_info": {
+          "package_name": "com.application.project_pipeline"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDbRgpu5hRGRsWVfg0MiqLMzYyBwjxETMQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
