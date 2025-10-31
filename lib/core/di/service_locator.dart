@@ -9,6 +9,24 @@ import 'package:task_app/features/auth/domain/usecases/signin_usecase.dart';
 import 'package:task_app/features/auth/domain/usecases/auth_usecases.dart';
 import 'package:task_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:task_app/core/theme/theme_cubit.dart';
+import 'package:task_app/features/projects/data/datasources/project_remote_datasource.dart';
+import 'package:task_app/features/projects/data/repositories/project_repository_impl.dart';
+import 'package:task_app/features/projects/domain/repositories/project_repository.dart';
+import 'package:task_app/features/projects/domain/usecases/create_project_usecase.dart';
+import 'package:task_app/features/projects/domain/usecases/get_projects_usecase.dart';
+import 'package:task_app/features/projects/domain/usecases/find_user_by_email_usecase.dart';
+import 'package:task_app/features/projects/domain/usecases/send_team_invite_usecase.dart';
+import 'package:task_app/features/projects/domain/usecases/get_invites_usecase.dart';
+import 'package:task_app/features/projects/domain/usecases/accept_invite_usecase.dart';
+import 'package:task_app/features/projects/domain/usecases/reject_invite_usecase.dart';
+import 'package:task_app/features/projects/presentation/bloc/project_bloc.dart';
+import 'package:task_app/features/projects/data/datasources/task_remote_data_source.dart';
+import 'package:task_app/features/projects/data/repositories/task_repository_impl.dart';
+import 'package:task_app/features/projects/domain/repositories/task_repository.dart';
+import 'package:task_app/features/projects/domain/usecases/stream_tasks_usecase.dart';
+import 'package:task_app/features/projects/domain/usecases/create_task_usecase.dart';
+import 'package:task_app/features/projects/domain/usecases/update_task_status_usecase.dart';
+import 'package:task_app/features/projects/presentation/bloc/task_bloc.dart';
 
 final sl = GetIt.instance;
 
@@ -47,4 +65,49 @@ Future<void> init() async {
 
   // Theme Cubit
   sl.registerFactory(() => ThemeCubit(localStorageService: sl()));
+
+  // ========== Projects Feature ==========
+  
+  // Data Sources
+  sl.registerLazySingleton<ProjectRemoteDatasource>(
+    () => ProjectRemoteDatasourceImpl(),
+  );
+  sl.registerLazySingleton<TaskRemoteDataSource>(
+    () => TaskRemoteDataSourceImpl(),
+  );
+
+  // Repositories
+  sl.registerLazySingleton<ProjectRepository>(
+    () => ProjectRepositoryImpl(remoteDatasource: sl()),
+  );
+  sl.registerLazySingleton<TaskRepository>(
+    () => TaskRepositoryImpl(remote: sl()),
+  );
+
+  // Use Cases
+  sl.registerLazySingleton(() => CreateProject(sl()));
+  sl.registerLazySingleton(() => GetProjects(sl()));
+  sl.registerLazySingleton(() => FindUserByEmail(sl()));
+  sl.registerLazySingleton(() => SendTeamInvite(sl()));
+  sl.registerLazySingleton(() => GetInvites(sl()));
+  sl.registerLazySingleton(() => AcceptInvite(sl()));
+  sl.registerLazySingleton(() => RejectInvite(sl()));
+  sl.registerLazySingleton(() => StreamTasks(sl()));
+  sl.registerLazySingleton(() => CreateTask(sl()));
+  sl.registerLazySingleton(() => UpdateTaskStatus(sl()));
+
+  // BLoC
+  sl.registerFactory(() => ProjectBloc(
+    createProject: sl(),
+    getProjects: sl(),
+    findUserByEmail: sl(),
+    getInvites: sl(),
+    acceptInvite: sl(),
+    rejectInvite: sl(),
+  ));
+  sl.registerFactory(() => TaskBloc(
+        streamTasks: sl(),
+        createTask: sl(),
+        updateTaskStatus: sl(),
+      ));
 }

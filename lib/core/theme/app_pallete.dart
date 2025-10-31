@@ -9,4 +9,5 @@ class AppPallete {
   static const Color lightGray = Color(0xFFF3F4F6); // Light gray for input backgrounds
   static const Color borderGray = Color(0xFFE5E7EB); // Border color
   static const Color textGray = Color(0xFF6B7280); // Placeholder text color
+  static const Color orange = Color(0xFFFF6B35); // Orange accent color
 }

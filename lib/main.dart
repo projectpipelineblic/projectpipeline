@@ -7,6 +7,7 @@ import 'package:task_app/core/routes/routes.dart';
 import 'package:task_app/core/theme/app_theme.dart';
 import 'package:task_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:task_app/core/theme/theme_cubit.dart';
+import 'package:task_app/features/projects/presentation/bloc/project_bloc.dart';
 import 'package:task_app/firebase_options.dart';
 
 void main() async {
@@ -20,6 +21,7 @@ void main() async {
       providers: [
         BlocProvider(create: (_) => sl<AuthBloc>()),
         BlocProvider(create: (_) => sl<ThemeCubit>()),
+        BlocProvider(create: (_) => sl<ProjectBloc>()),
       ],
       child: const MyApp(),
     ),
