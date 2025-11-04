@@ -6,6 +6,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:task_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:task_app/core/widgets/primart_text.dart';
 import 'package:task_app/features/projects/domain/entities/project_entity.dart';
+import 'package:task_app/features/projects/presentation/pages/task_detail_page.dart';
+import 'package:task_app/features/projects/presentation/shared/task_types.dart';
 
 class ProjectDetailPage extends StatefulWidget {
   const ProjectDetailPage({super.key, required this.project});
@@ -17,12 +19,13 @@ class ProjectDetailPage extends StatefulWidget {
 }
 
 class _ProjectDetailPageState extends State<ProjectDetailPage> {
-  final List<_TaskItem> _tasks = <_TaskItem>[];
+  final List<TaskItem> _tasks = <TaskItem>[];
   TaskStatusFilter _selectedFilter = TaskStatusFilter.all;
   String? _filterAssigneeId;
   TaskPriority? _filterPriority;
   DateTime? _filterDueBefore;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _tasksSub;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _projectSub;
   bool _showMembers = false;
   String? _currentUserUid;
   late ProjectEntity _project;
@@ -32,11 +35,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     super.initState();
     _project = widget.project;
     _subscribeTasks();
+    _subscribeToProject();
   }
 
   @override
   void dispose() {
     _tasksSub?.cancel();
+    _projectSub?.cancel();
     super.dispose();
   }
 
@@ -54,6 +59,59 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     }
   }
 
+  void _subscribeToProject() {
+    final projectId = widget.project.id;
+    if (projectId == null) return;
+    _projectSub?.cancel();
+    _projectSub = FirebaseFirestore.instance
+        .collection('Projects')
+        .doc(projectId)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists && mounted) {
+        final data = snapshot.data();
+        if (data != null) {
+          setState(() {
+            _project = ProjectEntity(
+              id: snapshot.id,
+              name: data['name'] as String? ?? '',
+              description: data['description'] as String? ?? '',
+              creatorUid: data['creatorUid'] as String? ?? '',
+              creatorName: data['creatorName'] as String? ?? '',
+              createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+              members: (data['members'] as List?)
+                      ?.map((m) => ProjectMember(
+                            uid: m['uid'] as String? ?? '',
+                            email: m['email'] as String? ?? '',
+                            name: m['name'] as String? ?? '',
+                            role: m['role'] as String? ?? 'member',
+                            hasAccess: m['hasAccess'] as bool? ?? true,
+                          ))
+                      .toList() ??
+                  [],
+              pendingInvites: (data['pendingInvites'] as List?)
+                      ?.map((i) => ProjectInvite(
+                            inviteId: i['inviteId'] as String? ?? '',
+                            projectId: i['projectId'] as String? ?? '',
+                            projectName: i['projectName'] as String? ?? '',
+                            invitedUserUid: i['invitedUserUid'] as String? ?? '',
+                            invitedUserEmail: i['invitedUserEmail'] as String? ?? '',
+                            creatorUid: i['creatorUid'] as String? ?? '',
+                            creatorName: i['creatorName'] as String? ?? '',
+                            createdAt: (i['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+                            role: i['role'] as String? ?? 'member',
+                            hasAccess: i['hasAccess'] as bool? ?? true,
+                            status: i['status'] as String? ?? 'pending',
+                          ))
+                      .toList() ??
+                  [],
+            );
+          });
+        }
+      }
+    });
+  }
+
   void _subscribeTasks() {
     final projectId = widget.project.id;
     if (projectId == null) return;
@@ -67,7 +125,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         .listen((snapshot) {
       final list = snapshot.docs.map((d) {
         final data = d.data();
-        return _TaskItem(
+        return TaskItem(
+          id: data['id'] as String? ?? d.id,
           title: data['title'] as String? ?? '',
           description: data['description'] as String? ?? '',
           assigneeId: data['assigneeId'] as String? ?? '',
@@ -119,15 +178,16 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         title: PrimaryText(
           text: _project.name,
           size: 20,
           fontWeight: FontWeight.bold,
-          color: AppPallete.secondary,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFFE5E7EB)
+              : AppPallete.secondary,
         ),
         actions: [
           IconButton(
@@ -170,7 +230,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   tooltip: 'Filter',
                   onPressed: _openFilterSheet,
                   icon: const Icon(Icons.filter_list),
-                  color: AppPallete.secondary,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFFE5E7EB)
+                      : AppPallete.secondary,
                 ),
                 const SizedBox(width: 4),
                 const _SectionTitle(title: 'Tasks'),
@@ -182,15 +244,19 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               onChanged: (f) => setState(() => _selectedFilter = f),
             ),
             const SizedBox(height: 12),
-            _TaskList(tasks: _filteredTasks()),
+            _TaskList(
+              tasks: _filteredTasks(),
+              projectId: _project.id,
+              project: _project,
+            ),
           ],
         ),
       ),
     );
   }
 
-  List<_TaskItem> _filteredTasks() {
-    Iterable<_TaskItem> it = _tasks;
+  List<TaskItem> _filteredTasks() {
+    Iterable<TaskItem> it = _tasks;
     switch (_selectedFilter) {
       case TaskStatusFilter.all:
         break;
@@ -220,7 +286,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).dialogBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(16),
@@ -238,7 +304,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               top: 16,
               bottom: 16 + insets.bottom,
             ),
-            child: _CreateTaskForm(
+              child: _CreateTaskForm(
               project: _project,
               onSubmit: (task) async {
                 await _createTaskInFirestore(task);
@@ -255,7 +321,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     );
   }
 
-  Future<void> _createTaskInFirestore(_TaskItem task) async {
+  Future<void> _createTaskInFirestore(TaskItem task) async {
     final projectId = _project.id;
     if (projectId == null) return;
     final col = FirebaseFirestore.instance
@@ -295,21 +361,54 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }) async {
     final projectId = _project.id;
     if (projectId == null) return;
-    final ref = FirebaseFirestore.instance.collection('Projects').doc(projectId);
-    final snap = await ref.get();
-    if (!snap.exists) return;
-    final data = snap.data()!;
-    final List<dynamic> membersRaw = data['members'] as List<dynamic>? ?? <dynamic>[];
-    final members = membersRaw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    for (final m in members) {
-      if (m['uid'] == memberUid) {
-        m['role'] = makeAdmin ? 'admin' : 'member';
-        break;
+    try {
+      final ref = FirebaseFirestore.instance.collection('Projects').doc(projectId);
+      final snap = await ref.get();
+      if (!snap.exists) return;
+      final data = snap.data()!;
+      final List<dynamic> membersRaw = data['members'] as List<dynamic>? ?? <dynamic>[];
+      final members = membersRaw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      for (final m in members) {
+        if (m['uid'] == memberUid) {
+          m['role'] = makeAdmin ? 'admin' : 'member';
+          break;
+        }
       }
+      await ref.update({'members': members});
+      
+      // Update local state immediately
+      if (!mounted) return;
+      final updatedMembers = _project.members.map((member) {
+        if (member.uid == memberUid) {
+          return ProjectMember(
+            uid: member.uid,
+            email: member.email,
+            name: member.name,
+            role: makeAdmin ? 'admin' : 'member',
+            hasAccess: member.hasAccess,
+          );
+        }
+        return member;
+      }).toList();
+      
+      setState(() {
+        _project = ProjectEntity(
+          id: _project.id,
+          name: _project.name,
+          description: _project.description,
+          creatorUid: _project.creatorUid,
+          creatorName: _project.creatorName,
+          createdAt: _project.createdAt,
+          members: updatedMembers,
+          pendingInvites: _project.pendingInvites,
+        );
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update role: $e')),
+      );
     }
-    await ref.update({'members': members});
-    if (!mounted) return;
-    setState(() {}); // refresh local widgets using widget.project members next build if passed anew
   }
 
   Future<void> _openEditProjectSheet() async {
@@ -319,7 +418,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
     await showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).dialogBackgroundColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
@@ -334,11 +433,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const PrimaryText(
+                  PrimaryText(
                     text: 'Edit Project',
                     size: 18,
                     fontWeight: FontWeight.w700,
-                    color: AppPallete.secondary,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFFE5E7EB)
+                        : AppPallete.secondary,
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -360,12 +461,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: PrimaryText(
                           text: 'Add members (optional)',
                           size: 14,
                           fontWeight: FontWeight.w700,
-                          color: AppPallete.secondary,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? const Color(0xFFE5E7EB)
+                              : AppPallete.secondary,
                         ),
                       ),
                       OutlinedButton.icon(
@@ -534,7 +637,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   void _openFilterSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).dialogBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(16),
@@ -553,11 +656,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const PrimaryText(
+                PrimaryText(
                   text: 'Filter tasks',
                   size: 18,
                   fontWeight: FontWeight.w700,
-                  color: AppPallete.secondary,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFFE5E7EB)
+                      : AppPallete.secondary,
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -617,7 +722,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                               ? 'Due before: Any'
                               : 'Due before: ${_formatShortDate(dueBefore)}',
                           size: 14,
-                          color: AppPallete.secondary,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? const Color(0xFFE5E7EB)
+                              : AppPallete.secondary,
                         ),
                       ),
                     ),
@@ -682,7 +789,7 @@ class _ProjectHeader extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Theme.of(context).dividerColor, width: 1),
-        color: Colors.white,
+        color: Theme.of(context).cardTheme.color,
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -779,7 +886,9 @@ class _SectionTitle extends StatelessWidget {
       text: title,
       size: 16,
       fontWeight: FontWeight.w700,
-      color: AppPallete.secondary,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFFE5E7EB)
+          : AppPallete.secondary,
     );
   }
 }
@@ -834,11 +943,13 @@ class _MembersList extends StatelessWidget {
     final matches = project.members.where((m) => m.uid == currentUserUid);
     final ProjectMember? currentMember = matches.isNotEmpty ? matches.first : null;
     final isCurrentAdmin = (currentMember?.role ?? 'member') == 'admin';
+    final isCurrentUserOwner = currentUserUid == project.creatorUid;
+    final canEditRoles = isCurrentAdmin || isCurrentUserOwner;
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Theme.of(context).dividerColor, width: 1),
       ),
@@ -846,11 +957,13 @@ class _MembersList extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const PrimaryText(
+          PrimaryText(
             text: 'Members',
             size: 14,
             fontWeight: FontWeight.w700,
-            color: AppPallete.secondary,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFFE5E7EB)
+                : AppPallete.secondary,
           ),
           const SizedBox(height: 8),
           for (final m in project.members) ...[
@@ -882,7 +995,9 @@ class _MembersList extends StatelessWidget {
                           text: m.name.isNotEmpty ? m.name : m.email,
                           size: 14,
                           fontWeight: FontWeight.w600,
-                          color: AppPallete.secondary,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? const Color(0xFFE5E7EB)
+                              : AppPallete.secondary,
                         ),
                         const SizedBox(height: 2),
                         PrimaryText(
@@ -897,10 +1012,10 @@ class _MembersList extends StatelessWidget {
                   ),
                   Switch.adaptive(
                     value: m.role == 'admin',
-                    onChanged: (!isCurrentAdmin || m.uid == project.creatorUid)
+                    onChanged: (!canEditRoles || m.uid == project.creatorUid)
                         ? null
-                        : (val) {
-                            onToggleRole(memberUid: m.uid, makeAdmin: val);
+                        : (val) async {
+                            await onToggleRole(memberUid: m.uid, makeAdmin: val);
                           },
                   ),
                 ],
@@ -997,9 +1112,11 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _TaskList extends StatelessWidget {
-  const _TaskList({required this.tasks});
+  const _TaskList({required this.tasks, this.projectId, this.project});
 
-  final List<_TaskItem> tasks;
+  final List<TaskItem> tasks;
+  final String? projectId;
+  final ProjectEntity? project;
 
   @override
   Widget build(BuildContext context) {
@@ -1009,7 +1126,7 @@ class _TaskList extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardTheme.color,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Theme.of(context).dividerColor, width: 1),
         ),
@@ -1029,7 +1146,7 @@ class _TaskList extends StatelessWidget {
           Container(
             margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardTheme.color,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Theme.of(context).dividerColor, width: 1),
               boxShadow: [
@@ -1060,7 +1177,9 @@ class _TaskList extends StatelessWidget {
                 text: t.title,
                 size: 16,
                 fontWeight: FontWeight.w700,
-                color: AppPallete.secondary,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFFE5E7EB)
+                    : AppPallete.secondary,
               ),
               subtitle: Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -1085,7 +1204,17 @@ class _TaskList extends StatelessWidget {
                 ),
               ),
               trailing: Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
-              onTap: () {},
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => TaskDetailPage(
+                      task: t,
+                      projectId: projectId ?? '',
+                      project: project,
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ]
@@ -1107,37 +1236,7 @@ class _TaskList extends StatelessWidget {
   }
 }
 
-class _TaskItem {
-  _TaskItem({
-    required this.title,
-    required this.description,
-    required this.assigneeId,
-    required this.assigneeName,
-    required this.priority,
-    required this.subTasks,
-    required this.dueDate,
-    this.status = TaskStatus.todo,
-  });
-
-  final String title;
-  final String description;
-  final String assigneeId;
-  final String assigneeName;
-  final TaskPriority priority;
-  final List<String> subTasks;
-  final DateTime? dueDate;
-  final TaskStatus status;
-
-  String get dueDateLabel {
-    if (dueDate == null) return '';
-    final d = dueDate!;
-    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-  }
-}
-
-enum TaskPriority { low, medium, high }
-
-enum TaskStatus { todo, inProgress, done }
+// TaskItem and enums are now in shared/task_types.dart
 
 enum TaskStatusFilter { all, todo, inProgress, done }
 
@@ -1145,7 +1244,7 @@ class _CreateTaskForm extends StatefulWidget {
   const _CreateTaskForm({required this.project, required this.onSubmit});
 
   final ProjectEntity project;
-  final ValueChanged<_TaskItem> onSubmit;
+  final ValueChanged<TaskItem> onSubmit;
 
   @override
   State<_CreateTaskForm> createState() => _CreateTaskFormState();
@@ -1184,12 +1283,14 @@ class _CreateTaskFormState extends State<_CreateTaskForm> {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: PrimaryText(
                   text: 'Create Task',
                   size: 18,
                   fontWeight: FontWeight.w700,
-                  color: AppPallete.secondary,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFFE5E7EB)
+                      : AppPallete.secondary,
                 ),
               ),
               IconButton(
@@ -1264,15 +1365,19 @@ class _CreateTaskFormState extends State<_CreateTaskForm> {
                   ? 'Due date: Pick due date'
                   : 'Due date: ${_dueDate!.day.toString().padLeft(2, '0')}/${_dueDate!.month.toString().padLeft(2, '0')}/${_dueDate!.year}',
               size: 14,
-              color: AppPallete.secondary,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFFE5E7EB)
+                  : AppPallete.secondary,
             ),
           ),
           const SizedBox(height: 12),
-          const PrimaryText(
+          PrimaryText(
             text: 'Sub tasks',
             size: 14,
             fontWeight: FontWeight.w700,
-            color: AppPallete.secondary,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFFE5E7EB)
+                : AppPallete.secondary,
           ),
           const SizedBox(height: 8),
           for (int i = 0; i < _subTaskCtrls.length; i++)
@@ -1347,7 +1452,7 @@ class _CreateTaskFormState extends State<_CreateTaskForm> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     final subTasks = _subTaskCtrls.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
-    final task = _TaskItem(
+    final task = TaskItem(
       title: _nameCtrl.text.trim(),
       description: _descCtrl.text.trim(),
       assigneeId: _assigneeId!,

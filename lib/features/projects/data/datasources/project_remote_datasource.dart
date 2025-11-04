@@ -14,6 +14,8 @@ abstract class ProjectRemoteDatasource {
 
   Future<List<ProjectEntity>> getProjects(String userId);
 
+  Future<List<ProjectEntity>> getOpenProjects(String userId);
+
   Future<UserInfo> findUserByEmail(String email);
 
   Future<void> sendTeamInvite({
@@ -180,6 +182,44 @@ class ProjectRemoteDatasourceImpl implements ProjectRemoteDatasource {
       return projects;
     } catch (e) {
       throw Exception('Error getting projects: $e');
+    }
+  }
+
+  @override
+  Future<List<ProjectEntity>> getOpenProjects(String userId) async {
+    try {
+      // Get all projects where user is a member
+      final projectsQuery = await _firestore.collection('Projects').get();
+
+      final userProjects = projectsQuery.docs.where((doc) {
+        final data = doc.data();
+        final members = data['members'] as List<dynamic>? ?? [];
+        return members.any((m) =>
+            m is Map<String, dynamic> && m['uid'] == userId);
+      }).toList();
+
+      // Filter projects that have incomplete tasks
+      final List<ProjectEntity> openProjects = [];
+
+      for (var projectDoc in userProjects) {
+        final tasksSnapshot = await _firestore
+            .collection('Projects')
+            .doc(projectDoc.id)
+            .collection('tasks')
+            .where('status', whereIn: ['todo', 'inProgress'])
+            .limit(1)
+            .get();
+
+        if (tasksSnapshot.docs.isNotEmpty) {
+          final data = projectDoc.data();
+          data['id'] = projectDoc.id;
+          openProjects.add(ProjectModel.fromJson(data));
+        }
+      }
+
+      return openProjects;
+    } catch (e) {
+      throw Exception('Error getting open projects: $e');
     }
   }
 

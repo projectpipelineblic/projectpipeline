@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:task_app/features/projects/presentation/pages/projects_page.dart';
 import 'package:task_app/features/profile/presentation/pages/profile_page.dart';
 import 'package:task_app/features/home/presentation/pages/dashboard_page.dart';
+import 'package:task_app/features/tasks_board/presentation/pages/tasks_board_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -13,11 +14,12 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
 
-  // Order: Home/Dashboard (0), My Project (1), Profile (2)
+  // Order: Home/Dashboard (0), Tasks (1), My Project (2), Profile (3)
   final List<Widget> _tabs = [
     const DashboardPage(), // Index 0 - Home tab shows Dashboard
-    const ProjectsPage(),  // Index 1 - My Project tab
-    const ProfilePage(),   // Index 2 - Profile tab
+    const TasksBoardPage(), // Index 1 - Tasks tab
+    const ProjectsPage(),   // Index 2 - My Project tab
+    const ProfilePage(),    // Index 3 - Profile tab
   ];
 
   @override
@@ -32,6 +34,7 @@ class _HomePageState extends State<HomePage> {
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.task_outlined), label: 'Tasks'),
           BottomNavigationBarItem(icon: Icon(Icons.list_alt_outlined), label: 'My Project'),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
         ],

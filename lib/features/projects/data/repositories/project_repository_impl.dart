@@ -43,6 +43,16 @@ class ProjectRepositoryImpl implements ProjectRepository {
   }
 
   @override
+  Future<Either<Failure, List<ProjectEntity>>> getOpenProjects(String userId) async {
+    try {
+      final projects = await _remoteDatasource.getOpenProjects(userId);
+      return Right(projects);
+    } catch (e) {
+      return Left(Failure(message: e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, UserInfo>> findUserByEmail(String email) async {
     try {
       final user = await _remoteDatasource.findUserByEmail(email);

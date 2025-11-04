@@ -88,25 +88,28 @@ class _ProjectsPageState extends State<ProjectsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const PrimaryText(
+        automaticallyImplyLeading: false,
+        title: PrimaryText(
           text: 'My Projects',
           size: 20,
           fontWeight: FontWeight.bold,
-          color: AppPallete.secondary,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFFE5E7EB)
+              : AppPallete.secondary,
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
       ),
       body: MultiBlocListener(
         listeners: [
           BlocListener<AuthBloc, AuthState>(
             listener: (context, authState) {
-              // When auth becomes available, (re)load projects
+              // When auth becomes available or username is updated, (re)load projects
               if (authState is AuthAuthenticated ||
                   authState is AuthSuccess ||
-                  authState is AuthOffline) {
+                  authState is AuthOffline ||
+                  authState is UsernameUpdated) {
                 _getCurrentUser();
               }
             },
@@ -173,14 +176,18 @@ class _ProjectsPageState extends State<ProjectsPage> {
             Icon(
               Icons.folder_outlined,
               size: 64,
-              color: AppPallete.textGray,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF9CA3AF)
+                  : AppPallete.textGray,
             ),
             const SizedBox(height: 16),
             PrimaryText(
               text: 'No projects yet',
               size: 20,
               fontWeight: FontWeight.bold,
-              color: AppPallete.secondary,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFFE5E7EB)
+                  : AppPallete.secondary,
             ),
             const SizedBox(height: 8),
             PrimaryText(

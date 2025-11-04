@@ -18,12 +18,6 @@ class DashboardHeaderWidget extends StatelessWidget {
             fontWeight: FontWeight.bold,
             color: context.colors.secondary,
           ),
-          const SizedBox(height: 4),
-          PrimaryText(
-            text: 'CoreTeam',
-            size: 16,
-            color: context.colors.secondary.withOpacity(0.6),
-          ),
         ],
       ),
     );

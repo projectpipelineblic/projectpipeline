@@ -4,6 +4,7 @@ import 'package:task_app/features/auth/presentation/pages/signup_page.dart';
 import 'package:task_app/features/auth/presentation/widgets/auth_wrapper.dart';
 import 'package:task_app/features/home/presentation/pages/home_page.dart';
 import 'package:task_app/features/profile/presentation/pages/settings_page.dart';
+import 'package:task_app/features/profile/presentation/pages/team_invites_page.dart';
 
 class AppRoutes {
   // Route names
@@ -12,6 +13,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String authWrapper = '/auth-wrapper';
   static const String settings = '/settings';
+  static const String teamInvites = '/team-invites';
 
   // Route map
   static Map<String, WidgetBuilder> get routes => {
@@ -20,6 +22,7 @@ class AppRoutes {
     home: (context) => const HomePage(),
     authWrapper: (context) => const AuthWrapper(),
     settings: (context) => const SettingsPage(),
+    teamInvites: (context) => const TeamInvitesPage(),
   };
 
   // Initial route
@@ -51,6 +54,11 @@ class AppRoutes {
       case AppRoutes.settings:
         return MaterialPageRoute(
           builder: (context) => const SettingsPage(),
+          settings: settings,
+        );
+      case AppRoutes.teamInvites:
+        return MaterialPageRoute(
+          builder: (context) => const TeamInvitesPage(),
           settings: settings,
         );
       default:

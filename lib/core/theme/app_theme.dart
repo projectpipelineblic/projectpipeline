@@ -22,6 +22,21 @@ class AppTheme {
       elevation: 0,
       centerTitle: false,
     ),
+    cardTheme: CardThemeData(
+      color: AppPallete.white,
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+    ),
+    listTileTheme: const ListTileThemeData(
+      textColor: AppPallete.secondary,
+      iconColor: AppPallete.secondary,
+    ),
+    dividerTheme: const DividerThemeData(
+      color: AppPallete.borderGray,
+      thickness: 1,
+    ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: AppPallete.lightGray,
@@ -41,6 +56,12 @@ class AppTheme {
         padding: const EdgeInsets.symmetric(vertical: 16),
       ),
     ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: AppPallete.primary,
+      ),
+    ),
+    dialogBackgroundColor: AppPallete.white,
   );
 
   static final darkModeTheme = ThemeData.dark().copyWith(
@@ -57,6 +78,26 @@ class AppTheme {
       foregroundColor: AppPallete.white,
       elevation: 0,
       centerTitle: false,
+    ),
+    cardTheme: CardThemeData(
+      color: const Color(0xFF1E1E1E),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+    ),
+    listTileTheme: const ListTileThemeData(
+      textColor: Color(0xFFE5E7EB),
+      iconColor: Color(0xFFE5E7EB),
+    ),
+    dividerTheme: const DividerThemeData(
+      color: Color(0xFF404040),
+      thickness: 1,
+    ),
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      backgroundColor: Color(0xFF1E1E1E),
+      selectedItemColor: AppPallete.primary,
+      unselectedItemColor: Color(0xFF9CA3AF),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -77,5 +118,22 @@ class AppTheme {
         padding: const EdgeInsets.symmetric(vertical: 16),
       ),
     ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: AppPallete.primary,
+      ),
+    ),
+    iconTheme: const IconThemeData(
+      color: Color(0xFFE5E7EB),
+    ),
+    textTheme: const TextTheme(
+      bodyLarge: TextStyle(color: Color(0xFFE5E7EB)),
+      bodyMedium: TextStyle(color: Color(0xFFE5E7EB)),
+      bodySmall: TextStyle(color: Color(0xFF9CA3AF)),
+      titleLarge: TextStyle(color: Color(0xFFE5E7EB)),
+      titleMedium: TextStyle(color: Color(0xFFE5E7EB)),
+      titleSmall: TextStyle(color: Color(0xFFE5E7EB)),
+    ),
+    dialogBackgroundColor: const Color(0xFF1E1E1E),
   );
 }

@@ -48,3 +48,23 @@ class AuthOffline extends AuthState {
   @override
   List<Object> get props => [user];
 }
+
+class UsernameUpdating extends AuthState {}
+
+class UsernameUpdated extends AuthState {
+  final UserEntity user;
+
+  const UsernameUpdated(this.user);
+
+  @override
+  List<Object> get props => [user];
+}
+
+class UsernameUpdateError extends AuthState {
+  final String message;
+
+  const UsernameUpdateError(this.message);
+
+  @override
+  List<Object> get props => [message];
+}

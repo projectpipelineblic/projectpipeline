@@ -5,6 +5,7 @@ import 'package:task_app/features/projects/domain/entities/task_entity.dart';
 
 abstract class TaskRepository {
   Stream<List<TaskEntity>> streamTasks({required String projectId});
+  Future<Either<Failure, List<TaskEntity>>> getUserTasks({required String userId});
   Future<Either<Failure, void>> createTask({required TaskEntity task});
   Future<Either<Failure, void>> updateTaskStatus({
     required String projectId,

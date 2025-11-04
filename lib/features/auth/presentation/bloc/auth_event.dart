@@ -38,3 +38,16 @@ class SignInRequested extends AuthEvent {
 class CheckAuthStatusRequested extends AuthEvent {}
 
 class SignOutRequested extends AuthEvent {}
+
+class UpdateUsernameRequested extends AuthEvent {
+  final String uid;
+  final String newUsername;
+
+  const UpdateUsernameRequested({
+    required this.uid,
+    required this.newUsername,
+  });
+
+  @override
+  List<Object> get props => [uid, newUsername];
+}

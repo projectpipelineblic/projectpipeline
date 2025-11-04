@@ -15,6 +15,16 @@ class TaskRepositoryImpl implements TaskRepository {
   }
 
   @override
+  Future<Either<Failure, List<TaskEntity>>> getUserTasks({required String userId}) async {
+    try {
+      final tasks = await remote.getUserTasks(userId: userId);
+      return Right(tasks);
+    } catch (e) {
+      return Left(Failure(message: 'Failed to get user tasks'));
+    }
+  }
+
+  @override
   Future<Either<Failure, void>> createTask({required TaskEntity task}) async {
     try {
       await remote.createTask(task: task);

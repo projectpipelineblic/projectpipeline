@@ -50,4 +50,14 @@ class AuthRepositoryImpl implements AuthRepository {
       return Left(Failure(message: e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, UserEntity>> updateUsername(String uid, String newUsername) async {
+    try {
+      final UserEntity userEntity = await _remoteDatasource.updateUsername(uid, newUsername);
+      return Right(userEntity);
+    } catch (e) {
+      return Left(Failure(message: e.toString()));
+    }
+  }
 }

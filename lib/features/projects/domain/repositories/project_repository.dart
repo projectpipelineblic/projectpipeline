@@ -13,6 +13,8 @@ abstract class ProjectRepository {
 
   Future<Either<Failure, List<ProjectEntity>>> getProjects(String userId);
 
+  Future<Either<Failure, List<ProjectEntity>>> getOpenProjects(String userId);
+
   Future<Either<Failure, UserInfo>> findUserByEmail(String email);
 
   Future<Either<Failure, void>> sendTeamInvite({

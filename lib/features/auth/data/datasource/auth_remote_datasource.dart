@@ -9,6 +9,7 @@ abstract class AuthRemoteDatasource {
   Future<UserEntity> signInWithEmailAndPassword(String email, String password);
   Future<UserEntity> getCurrentUser();
   Future<void> signOut();
+  Future<UserEntity> updateUsername(String uid, String newUsername);
 }
 
 class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
@@ -117,6 +118,97 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
     } catch (e) {
       print('Sign out error: $e');
       throw Exception('Sign out error: $e');
+    }
+  }
+
+  @override
+  Future<UserEntity> updateUsername(String uid, String newUsername) async {
+    try {
+      // Use a batch to update all documents atomically
+      final WriteBatch batch = _firestore.batch();
+
+      // 1. Update username in Users collection
+      final userRef = _firestore.collection('Users').doc(uid);
+      batch.update(userRef, {'userName': newUsername});
+
+      // 2. Update username in all Projects where user is creator
+      final creatorProjects = await _firestore
+          .collection('Projects')
+          .where('creatorUid', isEqualTo: uid)
+          .get();
+      
+      for (var doc in creatorProjects.docs) {
+        batch.update(doc.reference, {'creatorName': newUsername});
+      }
+
+      // 3. Update username in all Projects where user is a member
+      // Query all projects and filter by member uid
+      final allProjects = await _firestore.collection('Projects').get();
+      
+      for (var projectDoc in allProjects.docs) {
+        final projectData = projectDoc.data();
+        final members = List<Map<String, dynamic>>.from(projectData['members'] ?? []);
+        
+        // Check if user is a member of this project
+        final isMember = members.any((member) => member['uid'] == uid);
+        
+        if (isMember) {
+          // Update the member's name in the members array
+          final updatedMembers = members.map((member) {
+            if (member['uid'] == uid) {
+              return {...member, 'name': newUsername};
+            }
+            return member;
+          }).toList();
+          
+          batch.update(projectDoc.reference, {'members': updatedMembers});
+        }
+      }
+
+      // 4. Update assigneeName in all Tasks where user is assignee
+      // Since we already have all projects, iterate through each project's tasks
+      for (var projectDoc in allProjects.docs) {
+        final tasksSnapshot = await _firestore
+            .collection('Projects')
+            .doc(projectDoc.id)
+            .collection('tasks')
+            .where('assigneeId', isEqualTo: uid)
+            .get();
+        
+        for (var taskDoc in tasksSnapshot.docs) {
+          batch.update(taskDoc.reference, {'assigneeName': newUsername});
+        }
+      }
+
+      // 5. Update creatorName in all pending Invites where user is creator
+      final creatorInvites = await _firestore
+          .collection('Invites')
+          .where('creatorUid', isEqualTo: uid)
+          .where('status', isEqualTo: 'pending')
+          .get();
+      
+      for (var inviteDoc in creatorInvites.docs) {
+        batch.update(inviteDoc.reference, {'creatorName': newUsername});
+      }
+
+      // Commit all updates at once
+      await batch.commit();
+
+      // Get updated user data
+      final DocumentSnapshot userDoc = await _firestore.collection('Users').doc(uid).get();
+      
+      if (userDoc.exists) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        return UserModel.fromJson(userData);
+      } else {
+        throw Exception('User data not found');
+      }
+    } on FirebaseException catch (e) {
+      print('Firestore Error: ${e.code} - ${e.message}');
+      throw Exception('${e.code}: ${e.message}');
+    } catch (e) {
+      print('Unexpected Error: $e');
+      throw Exception('Unexpected Error: $e');
     }
   }
 }

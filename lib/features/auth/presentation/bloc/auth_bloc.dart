@@ -8,6 +8,7 @@ import 'package:task_app/features/auth/domain/entities/user_entity.dart';
 import 'package:task_app/features/auth/domain/usecases/signup_usecase.dart';
 import 'package:task_app/features/auth/domain/usecases/signin_usecase.dart';
 import 'package:task_app/features/auth/domain/usecases/auth_usecases.dart';
+import 'package:task_app/features/auth/domain/usecases/update_username_usecase.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -17,6 +18,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final SignInWithEmailAndPassword _signInWithEmailAndPassword;
   final GetCurrentUser _getCurrentUser;
   final SignOut _signOut;
+  final UpdateUsernameUsecase _updateUsernameUsecase;
   final ConnectivityService _connectivityService;
   final LocalStorageService _localStorageService;
 
@@ -25,12 +27,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     required SignInWithEmailAndPassword signInWithEmailAndPassword,
     required GetCurrentUser getCurrentUser,
     required SignOut signOut,
+    required UpdateUsernameUsecase updateUsernameUsecase,
     required ConnectivityService connectivityService,
     required LocalStorageService localStorageService,
   })  : _signUpWithEmailAndPassword = signUpWithEmailAndPassword,
         _signInWithEmailAndPassword = signInWithEmailAndPassword,
         _getCurrentUser = getCurrentUser,
         _signOut = signOut,
+        _updateUsernameUsecase = updateUsernameUsecase,
         _connectivityService = connectivityService,
         _localStorageService = localStorageService,
         super(AuthInitial()) {
@@ -38,6 +42,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<SignInRequested>(_onSignInRequested);
     on<CheckAuthStatusRequested>(_onCheckAuthStatusRequested);
     on<SignOutRequested>(_onSignOutRequested);
+    on<UpdateUsernameRequested>(_onUpdateUsernameRequested);
   }
 
   // Friendly error mapping moved to core/utils/error_mapper.dart
@@ -165,5 +170,40 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     } else {
       emit(AuthUnauthenticated());
     }
+  }
+
+  Future<void> _onUpdateUsernameRequested(
+    UpdateUsernameRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(UsernameUpdating());
+
+    // Check connectivity
+    final isConnected = await _connectivityService.checkConnectivity();
+    if (!isConnected) {
+      emit(const UsernameUpdateError('Check your internet connectivity'));
+      return;
+    }
+
+    final result = await _updateUsernameUsecase(
+      UpdateUsernameParams(
+        uid: event.uid,
+        newUsername: event.newUsername,
+      ),
+    );
+
+    await result.fold(
+      (failure) async {
+        emit(UsernameUpdateError(authFriendlyMessage(failure.message)));
+      },
+      (user) async {
+        // Update cached user
+        await _localStorageService.cacheUser(user);
+        emit(UsernameUpdated(user));
+        // Transition to authenticated state with small delay to allow UI to show success
+        await Future.delayed(const Duration(milliseconds: 500));
+        emit(AuthAuthenticated(user));
+      },
+    );
   }
 }

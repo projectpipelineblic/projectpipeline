@@ -3,6 +3,7 @@ import 'package:task_app/features/projects/domain/entities/task_entity.dart';
 
 abstract class TaskRemoteDataSource {
   Stream<List<TaskEntity>> streamTasks({required String projectId});
+  Future<List<TaskEntity>> getUserTasks({required String userId});
   Future<void> createTask({required TaskEntity task});
   Future<void> updateTaskStatus({required String projectId, required String taskId, required TaskStatus status});
 }
@@ -20,6 +21,38 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs.map(_fromDoc).toList());
+  }
+
+  @override
+  Future<List<TaskEntity>> getUserTasks({required String userId}) async {
+    final projectsSnapshot = await _firestore.collection('Projects').get();
+    final List<TaskEntity> allUserTasks = [];
+
+    for (var projectDoc in projectsSnapshot.docs) {
+      final tasksSnapshot = await _firestore
+          .collection('Projects')
+          .doc(projectDoc.id)
+          .collection('tasks')
+          .where('assigneeId', isEqualTo: userId)
+          .get();
+      
+      allUserTasks.addAll(tasksSnapshot.docs.map(_fromDoc));
+    }
+
+    // Sort by due date and created date
+    allUserTasks.sort((a, b) {
+      if (a.dueDate != null && b.dueDate != null) {
+        return a.dueDate!.compareTo(b.dueDate!);
+      } else if (a.dueDate != null) {
+        return -1;
+      } else if (b.dueDate != null) {
+        return 1;
+      } else {
+        return b.createdAt.compareTo(a.createdAt);
+      }
+    });
+
+    return allUserTasks;
   }
 
   @override

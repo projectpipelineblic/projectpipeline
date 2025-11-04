@@ -7,6 +7,7 @@ import 'package:task_app/features/auth/domain/repositories/auth_repository.dart'
 import 'package:task_app/features/auth/domain/usecases/signup_usecase.dart';
 import 'package:task_app/features/auth/domain/usecases/signin_usecase.dart';
 import 'package:task_app/features/auth/domain/usecases/auth_usecases.dart';
+import 'package:task_app/features/auth/domain/usecases/update_username_usecase.dart';
 import 'package:task_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:task_app/core/theme/theme_cubit.dart';
 import 'package:task_app/features/projects/data/datasources/project_remote_datasource.dart';
@@ -26,7 +27,12 @@ import 'package:task_app/features/projects/domain/repositories/task_repository.d
 import 'package:task_app/features/projects/domain/usecases/stream_tasks_usecase.dart';
 import 'package:task_app/features/projects/domain/usecases/create_task_usecase.dart';
 import 'package:task_app/features/projects/domain/usecases/update_task_status_usecase.dart';
+import 'package:task_app/features/projects/domain/usecases/get_user_tasks_usecase.dart';
+import 'package:task_app/features/projects/domain/usecases/get_open_projects_usecase.dart';
 import 'package:task_app/features/projects/presentation/bloc/task_bloc.dart';
+import 'package:task_app/features/home/presentation/bloc/dashboard_bloc.dart';
+import 'package:task_app/features/tasks_board/domain/usecases/get_all_user_tasks_usecase.dart';
+import 'package:task_app/features/tasks_board/presentation/bloc/tasks_board_bloc.dart';
 
 final sl = GetIt.instance;
 
@@ -52,6 +58,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => SignInWithEmailAndPassword(authRepository: sl()));
   sl.registerLazySingleton(() => GetCurrentUser(authRepository: sl()));
   sl.registerLazySingleton(() => SignOut(authRepository: sl()));
+  sl.registerLazySingleton(() => UpdateUsernameUsecase(sl()));
 
   // BLoC
   sl.registerFactory(() => AuthBloc(
@@ -59,6 +66,7 @@ Future<void> init() async {
     signInWithEmailAndPassword: sl(),
     getCurrentUser: sl(),
     signOut: sl(),
+    updateUsernameUsecase: sl(),
     connectivityService: sl(),
     localStorageService: sl(),
   ));
@@ -87,12 +95,14 @@ Future<void> init() async {
   // Use Cases
   sl.registerLazySingleton(() => CreateProject(sl()));
   sl.registerLazySingleton(() => GetProjects(sl()));
+  sl.registerLazySingleton(() => GetOpenProjects(sl()));
   sl.registerLazySingleton(() => FindUserByEmail(sl()));
   sl.registerLazySingleton(() => SendTeamInvite(sl()));
   sl.registerLazySingleton(() => GetInvites(sl()));
   sl.registerLazySingleton(() => AcceptInvite(sl()));
   sl.registerLazySingleton(() => RejectInvite(sl()));
   sl.registerLazySingleton(() => StreamTasks(sl()));
+  sl.registerLazySingleton(() => GetUserTasks(sl()));
   sl.registerLazySingleton(() => CreateTask(sl()));
   sl.registerLazySingleton(() => UpdateTaskStatus(sl()));
 
@@ -108,6 +118,21 @@ Future<void> init() async {
   sl.registerFactory(() => TaskBloc(
         streamTasks: sl(),
         createTask: sl(),
+        updateTaskStatus: sl(),
+      ));
+  sl.registerFactory(() => DashboardBloc(
+        getUserTasks: sl(),
+        getOpenProjects: sl(),
+      ));
+
+  // ========== Tasks Board Feature ==========
+  
+  // Use Cases
+  sl.registerLazySingleton(() => GetAllUserTasks(sl()));
+
+  // BLoC
+  sl.registerFactory(() => TasksBoardBloc(
+        getAllUserTasks: sl(),
         updateTaskStatus: sl(),
       ));
 }
