@@ -1,8 +1,8 @@
 import 'package:fpdart/fpdart.dart';
-import 'package:task_app/core/error/failure.dart';
-import 'package:task_app/features/projects/data/datasources/project_remote_datasource.dart';
-import 'package:task_app/features/projects/domain/entities/project_entity.dart';
-import 'package:task_app/features/projects/domain/repositories/project_repository.dart';
+import 'package:project_pipeline/core/error/failure.dart';
+import 'package:project_pipeline/features/projects/data/datasources/project_remote_datasource.dart';
+import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
+import 'package:project_pipeline/features/projects/domain/repositories/project_repository.dart';
 
 class ProjectRepositoryImpl implements ProjectRepository {
   final ProjectRemoteDatasource _remoteDatasource;

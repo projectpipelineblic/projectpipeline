@@ -1,7 +1,7 @@
 
 import 'package:fpdart/fpdart.dart';
-import 'package:task_app/core/error/failure.dart';
-import 'package:task_app/features/projects/domain/entities/task_entity.dart';
+import 'package:project_pipeline/core/error/failure.dart';
+import 'package:project_pipeline/features/projects/domain/entities/task_entity.dart';
 
 abstract class TaskRepository {
   Stream<List<TaskEntity>> streamTasks({required String projectId});

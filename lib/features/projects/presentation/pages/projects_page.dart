@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:task_app/core/utils/app_snackbar.dart';
-import 'package:task_app/core/widgets/primart_text.dart';
-import 'package:task_app/core/theme/app_pallete.dart';
-import 'package:task_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:task_app/features/projects/domain/entities/project_entity.dart';
-import 'package:task_app/features/projects/presentation/bloc/project_bloc.dart';
-import 'package:task_app/features/projects/presentation/bloc/project_event.dart';
-import 'package:task_app/features/projects/presentation/bloc/project_state.dart';
-import 'package:task_app/features/projects/presentation/pages/add_project_page.dart';
-import 'package:task_app/features/projects/presentation/pages/project_detail_page.dart';
+import 'package:project_pipeline/core/utils/app_snackbar.dart';
+import 'package:project_pipeline/core/widgets/primart_text.dart';
+import 'package:project_pipeline/core/theme/app_pallete.dart';
+import 'package:project_pipeline/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
+import 'package:project_pipeline/features/projects/presentation/bloc/project_bloc.dart';
+import 'package:project_pipeline/features/projects/presentation/bloc/project_event.dart';
+import 'package:project_pipeline/features/projects/presentation/bloc/project_state.dart';
+import 'package:project_pipeline/features/projects/presentation/pages/add_project_page.dart';
+import 'package:project_pipeline/features/projects/presentation/pages/project_detail_page.dart';
 
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage({super.key});

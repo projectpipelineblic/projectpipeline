@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:task_app/core/di/service_locator.dart';
-import 'package:task_app/core/services/local_storage_service.dart';
-import 'package:task_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:task_app/features/home/presentation/bloc/dashboard_bloc.dart';
-import 'package:task_app/features/home/presentation/bloc/dashboard_event.dart';
-import 'package:task_app/features/home/presentation/bloc/dashboard_state.dart';
-import 'package:task_app/features/home/presentation/widgets/dashboard_header_widget.dart';
-import 'package:task_app/features/home/presentation/widgets/todays_tasks_section_widget.dart';
-import 'package:task_app/features/home/presentation/widgets/open_projects_section_widget.dart';
+import 'package:project_pipeline/core/di/service_locator.dart';
+import 'package:project_pipeline/core/services/local_storage_service.dart';
+import 'package:project_pipeline/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:project_pipeline/features/home/presentation/bloc/dashboard_bloc.dart';
+import 'package:project_pipeline/features/home/presentation/bloc/dashboard_event.dart';
+import 'package:project_pipeline/features/home/presentation/bloc/dashboard_state.dart';
+import 'package:project_pipeline/features/home/presentation/widgets/dashboard_header_widget.dart';
+import 'package:project_pipeline/features/home/presentation/widgets/todays_tasks_section_widget.dart';
+import 'package:project_pipeline/features/home/presentation/widgets/open_projects_section_widget.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});

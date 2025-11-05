@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:task_app/features/projects/data/models/project_model.dart';
-import 'package:task_app/features/projects/domain/entities/project_entity.dart';
-import 'package:task_app/features/projects/domain/repositories/project_repository.dart';
+import 'package:project_pipeline/features/projects/data/models/project_model.dart';
+import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
+import 'package:project_pipeline/features/projects/domain/repositories/project_repository.dart';
 
 abstract class ProjectRemoteDatasource {
   Future<ProjectEntity> createProject({

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:task_app/core/widgets/primart_text.dart';
-import 'package:task_app/core/extension/themex.dart';
-import 'package:task_app/core/theme/app_pallete.dart';
-import 'package:task_app/features/projects/domain/entities/project_entity.dart';
-import 'package:task_app/features/home/presentation/widgets/project_card_widget.dart';
-import 'package:task_app/features/projects/presentation/pages/project_detail_page.dart';
+import 'package:project_pipeline/core/widgets/primart_text.dart';
+import 'package:project_pipeline/core/extension/themex.dart';
+import 'package:project_pipeline/core/theme/app_pallete.dart';
+import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
+import 'package:project_pipeline/features/home/presentation/widgets/project_card_widget.dart';
+import 'package:project_pipeline/features/projects/presentation/pages/project_detail_page.dart';
 
 class OpenProjectsSectionWidget extends StatelessWidget {
   final List<ProjectEntity> projects;

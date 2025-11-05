@@ -1,9 +1,9 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:task_app/features/projects/domain/entities/task_entity.dart';
-import 'package:task_app/features/projects/domain/usecases/update_task_status_usecase.dart';
-import 'package:task_app/features/tasks_board/domain/usecases/get_all_user_tasks_usecase.dart';
-import 'package:task_app/features/tasks_board/presentation/bloc/tasks_board_event.dart';
-import 'package:task_app/features/tasks_board/presentation/bloc/tasks_board_state.dart';
+import 'package:project_pipeline/features/projects/domain/entities/task_entity.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/update_task_status_usecase.dart';
+import 'package:project_pipeline/features/tasks_board/domain/usecases/get_all_user_tasks_usecase.dart';
+import 'package:project_pipeline/features/tasks_board/presentation/bloc/tasks_board_event.dart';
+import 'package:project_pipeline/features/tasks_board/presentation/bloc/tasks_board_state.dart';
 
 class TasksBoardBloc extends Bloc<TasksBoardEvent, TasksBoardState> {
   TasksBoardBloc({

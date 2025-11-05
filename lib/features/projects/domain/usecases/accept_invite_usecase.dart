@@ -1,7 +1,7 @@
 import 'package:fpdart/fpdart.dart';
-import 'package:task_app/core/error/failure.dart';
-import 'package:task_app/core/usecase/usecase.dart';
-import 'package:task_app/features/projects/domain/repositories/project_repository.dart';
+import 'package:project_pipeline/core/error/failure.dart';
+import 'package:project_pipeline/core/usecase/usecase.dart';
+import 'package:project_pipeline/features/projects/domain/repositories/project_repository.dart';
 
 class AcceptInvite implements UseCase<void, AcceptInviteParams> {
   final ProjectRepository repository;

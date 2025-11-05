@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:task_app/core/theme/app_pallete.dart';
-import 'package:task_app/core/widgets/primart_text.dart';
+import 'package:project_pipeline/core/theme/app_pallete.dart';
+import 'package:project_pipeline/core/widgets/primart_text.dart';
 
 enum TaskStatusFilter { all, todo, inProgress, done }
 

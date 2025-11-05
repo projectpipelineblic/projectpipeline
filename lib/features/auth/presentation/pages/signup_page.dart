@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:task_app/core/routes/routes.dart';
-import 'package:task_app/core/utils/app_snackbar.dart';
-import 'package:task_app/core/widgets/primart_text.dart';
-import 'package:task_app/core/validator/validator.dart';
-import 'package:task_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:task_app/features/auth/presentation/widgets/auth_button.dart';
-import 'package:task_app/features/auth/presentation/widgets/auth_logo.dart';
-import 'package:task_app/features/auth/presentation/widgets/auth_rich_text.dart';
-import 'package:task_app/features/auth/presentation/widgets/auth_textfield.dart';
+import 'package:project_pipeline/core/routes/routes.dart';
+import 'package:project_pipeline/core/utils/app_snackbar.dart';
+import 'package:project_pipeline/core/widgets/primart_text.dart';
+import 'package:project_pipeline/core/validator/validator.dart';
+import 'package:project_pipeline/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:project_pipeline/features/auth/presentation/widgets/auth_button.dart';
+import 'package:project_pipeline/features/auth/presentation/widgets/auth_logo.dart';
+import 'package:project_pipeline/features/auth/presentation/widgets/auth_rich_text.dart';
+import 'package:project_pipeline/features/auth/presentation/widgets/auth_textfield.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});

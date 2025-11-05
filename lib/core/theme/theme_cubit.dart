@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:task_app/core/services/local_storage_service.dart';
+import 'package:project_pipeline/core/services/local_storage_service.dart';
 
 class ThemeState extends Equatable {
   final ThemeMode themeMode;

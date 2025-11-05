@@ -2,13 +2,14 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:task_app/core/di/service_locator.dart';
-import 'package:task_app/core/routes/routes.dart';
-import 'package:task_app/core/theme/app_theme.dart';
-import 'package:task_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:task_app/core/theme/theme_cubit.dart';
-import 'package:task_app/features/projects/presentation/bloc/project_bloc.dart';
-import 'package:task_app/firebase_options.dart';
+import 'package:project_pipeline/core/di/service_locator.dart';
+import 'package:project_pipeline/core/routes/routes.dart';
+import 'package:project_pipeline/core/theme/app_theme.dart';
+import 'package:project_pipeline/core/theme/theme_cubit.dart';
+import 'package:project_pipeline/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:project_pipeline/features/projects/presentation/bloc/project_bloc.dart';
+import 'package:project_pipeline/firebase_options.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

@@ -1,9 +1,9 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:task_app/features/home/presentation/bloc/dashboard_event.dart';
-import 'package:task_app/features/home/presentation/bloc/dashboard_state.dart';
-import 'package:task_app/features/projects/domain/usecases/get_user_tasks_usecase.dart';
-import 'package:task_app/features/projects/domain/usecases/get_open_projects_usecase.dart';
-import 'package:task_app/features/projects/domain/entities/task_entity.dart';
+import 'package:project_pipeline/features/home/presentation/bloc/dashboard_event.dart';
+import 'package:project_pipeline/features/home/presentation/bloc/dashboard_state.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/get_user_tasks_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/get_open_projects_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/entities/task_entity.dart';
 
 class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   final GetUserTasks _getUserTasks;

@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:task_app/features/projects/domain/entities/task_entity.dart';
-import 'package:task_app/features/projects/domain/usecases/create_task_usecase.dart';
-import 'package:task_app/features/projects/domain/usecases/stream_tasks_usecase.dart';
-import 'package:task_app/features/projects/domain/usecases/update_task_status_usecase.dart';
-import 'package:task_app/features/projects/presentation/bloc/task_event.dart';
-import 'package:task_app/features/projects/presentation/bloc/task_state.dart';
+import 'package:project_pipeline/features/projects/domain/entities/task_entity.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/create_task_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/stream_tasks_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/update_task_status_usecase.dart';
+import 'package:project_pipeline/features/projects/presentation/bloc/task_event.dart';
+import 'package:project_pipeline/features/projects/presentation/bloc/task_state.dart';
 
 class TaskBloc extends Bloc<TaskEvent, TaskState> {
   TaskBloc({

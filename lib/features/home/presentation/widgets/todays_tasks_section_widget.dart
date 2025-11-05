@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:task_app/core/widgets/primart_text.dart';
-import 'package:task_app/core/extension/themex.dart';
-import 'package:task_app/core/theme/app_pallete.dart';
-import 'package:task_app/features/projects/domain/entities/task_entity.dart' as task_entity;
-import 'package:task_app/features/home/presentation/widgets/task_card_widget.dart';
-import 'package:task_app/features/projects/presentation/pages/task_detail_page.dart';
-import 'package:task_app/features/projects/presentation/shared/task_types.dart';
+import 'package:project_pipeline/core/widgets/primart_text.dart';
+import 'package:project_pipeline/core/extension/themex.dart';
+import 'package:project_pipeline/core/theme/app_pallete.dart';
+import 'package:project_pipeline/features/projects/domain/entities/task_entity.dart' as task_entity;
+import 'package:project_pipeline/features/home/presentation/widgets/task_card_widget.dart';
+import 'package:project_pipeline/features/projects/presentation/pages/task_detail_page.dart';
+import 'package:project_pipeline/features/projects/presentation/shared/task_types.dart';
 
 class TodaysTasksSectionWidget extends StatefulWidget {
   final List<task_entity.TaskEntity> tasks;

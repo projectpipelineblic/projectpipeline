@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
-import 'package:task_app/features/projects/domain/entities/task_entity.dart';
-import 'package:task_app/features/projects/domain/entities/project_entity.dart';
+import 'package:project_pipeline/features/projects/domain/entities/task_entity.dart';
+import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
 
 abstract class DashboardState extends Equatable {
   @override

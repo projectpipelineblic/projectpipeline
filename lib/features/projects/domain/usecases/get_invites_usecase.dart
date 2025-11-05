@@ -1,8 +1,8 @@
 import 'package:fpdart/fpdart.dart';
-import 'package:task_app/core/error/failure.dart';
-import 'package:task_app/core/usecase/usecase.dart';
-import 'package:task_app/features/projects/domain/entities/project_entity.dart';
-import 'package:task_app/features/projects/domain/repositories/project_repository.dart';
+import 'package:project_pipeline/core/error/failure.dart';
+import 'package:project_pipeline/core/usecase/usecase.dart';
+import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
+import 'package:project_pipeline/features/projects/domain/repositories/project_repository.dart';
 
 class GetInvites implements UseCase<List<ProjectInvite>, GetInvitesParams> {
   final ProjectRepository repository;

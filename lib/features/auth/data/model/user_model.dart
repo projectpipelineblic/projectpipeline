@@ -1,4 +1,4 @@
-import 'package:task_app/features/auth/domain/entities/user_entity.dart';
+import 'package:project_pipeline/features/auth/domain/entities/user_entity.dart';
 
 class UserModel extends UserEntity {
   UserModel({

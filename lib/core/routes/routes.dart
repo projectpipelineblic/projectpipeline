@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:task_app/features/auth/presentation/pages/login_page.dart';
-import 'package:task_app/features/auth/presentation/pages/signup_page.dart';
-import 'package:task_app/features/auth/presentation/widgets/auth_wrapper.dart';
-import 'package:task_app/features/home/presentation/pages/home_page.dart';
-import 'package:task_app/features/profile/presentation/pages/settings_page.dart';
-import 'package:task_app/features/profile/presentation/pages/team_invites_page.dart';
+import 'package:project_pipeline/features/auth/presentation/pages/login_page.dart';
+import 'package:project_pipeline/features/auth/presentation/pages/signup_page.dart';
+import 'package:project_pipeline/features/auth/presentation/widgets/auth_wrapper.dart';
+import 'package:project_pipeline/features/home/presentation/pages/home_page.dart';
+import 'package:project_pipeline/features/profile/presentation/pages/settings_page.dart';
+import 'package:project_pipeline/features/profile/presentation/pages/team_invites_page.dart';
 
 class AppRoutes {
   // Route names

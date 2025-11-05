@@ -1,12 +1,12 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:task_app/features/projects/domain/usecases/create_project_usecase.dart';
-import 'package:task_app/features/projects/domain/usecases/get_projects_usecase.dart';
-import 'package:task_app/features/projects/domain/usecases/find_user_by_email_usecase.dart';
-import 'package:task_app/features/projects/domain/usecases/get_invites_usecase.dart';
-import 'package:task_app/features/projects/domain/usecases/accept_invite_usecase.dart';
-import 'package:task_app/features/projects/domain/usecases/reject_invite_usecase.dart';
-import 'package:task_app/features/projects/presentation/bloc/project_event.dart';
-import 'package:task_app/features/projects/presentation/bloc/project_state.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/create_project_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/get_projects_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/find_user_by_email_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/get_invites_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/accept_invite_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/reject_invite_usecase.dart';
+import 'package:project_pipeline/features/projects/presentation/bloc/project_event.dart';
+import 'package:project_pipeline/features/projects/presentation/bloc/project_state.dart';
 
 class ProjectBloc extends Bloc<ProjectEvent, ProjectState> {
   final CreateProject _createProject;

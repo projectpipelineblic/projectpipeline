@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:task_app/core/extension/themex.dart';
-import 'package:task_app/core/theme/app_theme.dart';
-import 'package:task_app/core/widgets/primart_text.dart';
+import 'package:project_pipeline/core/extension/themex.dart';
+import 'package:project_pipeline/core/theme/app_theme.dart';
+import 'package:project_pipeline/core/widgets/primart_text.dart';
 
 class AuthLogo extends StatelessWidget {
   const AuthLogo({super.key});

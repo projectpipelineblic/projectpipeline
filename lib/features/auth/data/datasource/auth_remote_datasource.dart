@@ -1,12 +1,14 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:task_app/features/auth/data/model/user_model.dart';
-import 'package:task_app/features/auth/domain/entities/user_entity.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:project_pipeline/features/auth/data/model/user_model.dart';
+import 'package:project_pipeline/features/auth/domain/entities/user_entity.dart';
 
 abstract class AuthRemoteDatasource {
   Future<UserEntity> signUpWithEmailAndPassword(UserEntity user);
   Future<UserEntity> signInWithEmailAndPassword(String email, String password);
+  Future<UserEntity> signInWithGoogle();
   Future<UserEntity> getCurrentUser();
   Future<void> signOut();
   Future<UserEntity> updateUsername(String uid, String newUsername);
@@ -15,6 +17,7 @@ abstract class AuthRemoteDatasource {
 class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   @override
   Future<UserEntity> signUpWithEmailAndPassword(UserEntity user) async {
@@ -80,6 +83,91 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
     } catch (e) {
       print('Unexpected Error: $e');
       throw Exception('Unexpected Error: $e');
+    }
+  }
+
+  @override
+  Future<UserEntity> signInWithGoogle() async {
+    try {
+      print('🔵 [Google Sign-In] Starting Google Sign-In flow...');
+      
+      // Trigger Google Sign-In flow
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      print('🔵 [Google Sign-In] Sign-In dialog completed');
+
+      if (googleUser == null) {
+        // User canceled the sign-in
+        print('⚠️ [Google Sign-In] User canceled the sign-in');
+        throw Exception('google-signin-canceled: User canceled the Google sign-in');
+      }
+
+      print('🔵 [Google Sign-In] Google user obtained: ${googleUser.email}');
+      print('🔵 [Google Sign-In] Obtaining authentication details...');
+
+      // Obtain auth details from request
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      print('🔵 [Google Sign-In] Authentication details obtained');
+      print('🔵 [Google Sign-In] Access Token present: ${googleAuth.accessToken != null}');
+      print('🔵 [Google Sign-In] ID Token present: ${googleAuth.idToken != null}');
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      print('🔵 [Google Sign-In] Firebase credential created');
+
+      // Sign in to Firebase with Google credential
+      print('🔵 [Google Sign-In] Signing in to Firebase...');
+      final UserCredential userCredential = await _auth.signInWithCredential(credential);
+      print('✅ [Google Sign-In] Firebase sign-in successful');
+
+      final String uid = userCredential.user!.uid;
+      final String email = userCredential.user!.email!;
+      print('🔵 [Google Sign-In] User UID: $uid');
+      print('🔵 [Google Sign-In] User Email: $email');
+
+      // Extract username from email (everything before @)
+      final String userName = email.split('@')[0];
+      print('🔵 [Google Sign-In] Extracted username: $userName');
+
+      // Check if user exists in Firestore
+      print('🔵 [Google Sign-In] Checking if user exists in Firestore...');
+      final DocumentSnapshot userDoc = await _firestore.collection('Users').doc(uid).get();
+
+      if (userDoc.exists) {
+        // User exists, return existing data
+        print('✅ [Google Sign-In] User exists in Firestore, returning existing data');
+        final userData = userDoc.data() as Map<String, dynamic>;
+        return UserModel.fromJson(userData);
+      } else {
+        // New user, create user document
+        print('🔵 [Google Sign-In] New user, creating Firestore document...');
+        final UserModel newUser = UserModel(
+          uid: uid,
+          userName: userName,
+          email: email,
+          password: '', // Google sign-in users don't have a password
+        );
+
+        // Store user data in Firestore
+        await _firestore.collection('Users').doc(uid).set(newUser.toJson());
+        print('✅ [Google Sign-In] User document created successfully');
+
+        return newUser;
+      }
+    } on FirebaseAuthException catch (e) {
+      print('❌ [Google Sign-In] Firebase Auth Error: ${e.code} - ${e.message}');
+      print('❌ [Google Sign-In] Full error details: $e');
+      throw Exception('firebase-auth-${e.code}: ${e.message}');
+    } on FirebaseException catch (e) {
+      print('❌ [Google Sign-In] Firestore Error: ${e.code} - ${e.message}');
+      print('❌ [Google Sign-In] Full error details: $e');
+      throw Exception('firestore-${e.code}: ${e.message}');
+    } catch (e, stackTrace) {
+      print('❌ [Google Sign-In] Unexpected Error: $e');
+      print('❌ [Google Sign-In] Stack trace: $stackTrace');
+      throw Exception('google-signin-error: $e');
     }
   }
 

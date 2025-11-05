@@ -1,5 +1,5 @@
 import 'package:fpdart/fpdart.dart';
-import 'package:task_app/core/error/failure.dart';
+import 'package:project_pipeline/core/error/failure.dart';
 
 abstract class UseCase<Type, Params> {
   Future<Either<Failure, Type>> call(Params params);

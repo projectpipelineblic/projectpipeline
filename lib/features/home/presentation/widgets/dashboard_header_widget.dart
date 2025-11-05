@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:task_app/core/widgets/primart_text.dart';
-import 'package:task_app/core/extension/themex.dart';
+import 'package:project_pipeline/core/widgets/primart_text.dart';
+import 'package:project_pipeline/core/extension/themex.dart';
 
 class DashboardHeaderWidget extends StatelessWidget {
   const DashboardHeaderWidget({super.key});

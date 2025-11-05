@@ -1,9 +1,8 @@
 import 'package:fpdart/fpdart.dart';
-import 'package:task_app/core/error/failure.dart';
-import 'package:task_app/features/auth/data/datasource/auth_remote_datasource.dart';
-import 'package:task_app/features/auth/data/model/user_model.dart';
-import 'package:task_app/features/auth/domain/entities/user_entity.dart';
-import 'package:task_app/features/auth/domain/repositories/auth_repository.dart';
+import 'package:project_pipeline/core/error/failure.dart';
+import 'package:project_pipeline/features/auth/data/datasource/auth_remote_datasource.dart';
+import 'package:project_pipeline/features/auth/domain/entities/user_entity.dart';
+import 'package:project_pipeline/features/auth/domain/repositories/auth_repository.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDatasource _remoteDatasource;
@@ -25,6 +24,16 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Either<Failure, UserEntity>> signInWithEmailAndPassword(String email, String password) async {
     try {
       final UserEntity userEntity = await _remoteDatasource.signInWithEmailAndPassword(email, password);
+      return Right(userEntity);
+    } catch (e) {
+      return Left(Failure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, UserEntity>> signInWithGoogle() async {
+    try {
+      final UserEntity userEntity = await _remoteDatasource.signInWithGoogle();
       return Right(userEntity);
     } catch (e) {
       return Left(Failure(message: e.toString()));

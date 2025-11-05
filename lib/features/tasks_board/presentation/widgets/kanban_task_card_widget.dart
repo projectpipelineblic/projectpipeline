@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:task_app/core/extension/themex.dart';
-import 'package:task_app/core/widgets/primart_text.dart';
-import 'package:task_app/core/theme/app_pallete.dart';
-import 'package:task_app/features/projects/domain/entities/task_entity.dart';
+
 import 'package:intl/intl.dart';
+import 'package:project_pipeline/core/extension/themex.dart';
+import 'package:project_pipeline/core/theme/app_pallete.dart';
+import 'package:project_pipeline/core/widgets/primart_text.dart';
+import 'package:project_pipeline/features/projects/domain/entities/task_entity.dart';
 
 class KanbanTaskCardWidget extends StatelessWidget {
   final TaskEntity task;

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:task_app/features/auth/domain/entities/user_entity.dart';
+import 'package:project_pipeline/features/auth/domain/entities/user_entity.dart';
 
 class LocalStorageService {
   static final LocalStorageService _instance = LocalStorageService._internal();

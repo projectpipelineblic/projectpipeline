@@ -1,6 +1,6 @@
 import 'package:fpdart/fpdart.dart';
-import 'package:task_app/core/error/failure.dart';
-import 'package:task_app/features/projects/domain/entities/project_entity.dart';
+import 'package:project_pipeline/core/error/failure.dart';
+import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
 
 abstract class ProjectRepository {
   Future<Either<Failure, ProjectEntity>> createProject({

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:task_app/features/projects/presentation/pages/projects_page.dart';
-import 'package:task_app/features/profile/presentation/pages/profile_page.dart';
-import 'package:task_app/features/home/presentation/pages/dashboard_page.dart';
-import 'package:task_app/features/tasks_board/presentation/pages/tasks_board_page.dart';
+import 'package:project_pipeline/features/projects/presentation/pages/projects_page.dart';
+import 'package:project_pipeline/features/profile/presentation/pages/profile_page.dart';
+import 'package:project_pipeline/features/home/presentation/pages/dashboard_page.dart';
+import 'package:project_pipeline/features/tasks_board/presentation/pages/tasks_board_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});

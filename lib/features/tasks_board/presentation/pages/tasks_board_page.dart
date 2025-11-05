@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:task_app/core/di/service_locator.dart';
-import 'package:task_app/core/services/local_storage_service.dart';
-import 'package:task_app/core/theme/app_pallete.dart';
-import 'package:task_app/core/widgets/primart_text.dart';
-import 'package:task_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:task_app/features/projects/domain/entities/task_entity.dart';
-import 'package:task_app/features/projects/presentation/pages/task_detail_page.dart';
-import 'package:task_app/features/projects/presentation/shared/task_types.dart' as task_types;
-import 'package:task_app/features/tasks_board/presentation/bloc/tasks_board_bloc.dart';
-import 'package:task_app/features/tasks_board/presentation/bloc/tasks_board_event.dart';
-import 'package:task_app/features/tasks_board/presentation/bloc/tasks_board_state.dart';
-import 'package:task_app/features/tasks_board/presentation/widgets/vertical_task_section_widget.dart';
+import 'package:project_pipeline/core/di/service_locator.dart';
+import 'package:project_pipeline/core/services/local_storage_service.dart';
+import 'package:project_pipeline/core/theme/app_pallete.dart';
+import 'package:project_pipeline/core/widgets/primart_text.dart';
+import 'package:project_pipeline/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:project_pipeline/features/projects/domain/entities/task_entity.dart';
+import 'package:project_pipeline/features/projects/presentation/pages/task_detail_page.dart';
+import 'package:project_pipeline/features/projects/presentation/shared/task_types.dart' as task_types;
+import 'package:project_pipeline/features/tasks_board/presentation/bloc/tasks_board_bloc.dart';
+import 'package:project_pipeline/features/tasks_board/presentation/bloc/tasks_board_event.dart';
+import 'package:project_pipeline/features/tasks_board/presentation/bloc/tasks_board_state.dart';
+import 'package:project_pipeline/features/tasks_board/presentation/widgets/vertical_task_section_widget.dart';
 
 class TasksBoardPage extends StatefulWidget {
   const TasksBoardPage({super.key});

@@ -1,8 +1,8 @@
 import 'package:fpdart/fpdart.dart';
-import 'package:task_app/core/error/failure.dart';
-import 'package:task_app/features/projects/data/datasources/task_remote_data_source.dart';
-import 'package:task_app/features/projects/domain/entities/task_entity.dart';
-import 'package:task_app/features/projects/domain/repositories/task_repository.dart';
+import 'package:project_pipeline/core/error/failure.dart';
+import 'package:project_pipeline/features/projects/data/datasources/task_remote_data_source.dart';
+import 'package:project_pipeline/features/projects/domain/entities/task_entity.dart';
+import 'package:project_pipeline/features/projects/domain/repositories/task_repository.dart';
 
 class TaskRepositoryImpl implements TaskRepository {
   TaskRepositoryImpl({required this.remote});

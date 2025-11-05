@@ -1,5 +1,5 @@
-import 'package:task_app/features/projects/domain/entities/task_entity.dart';
-import 'package:task_app/features/projects/domain/repositories/task_repository.dart';
+import 'package:project_pipeline/features/projects/domain/entities/task_entity.dart';
+import 'package:project_pipeline/features/projects/domain/repositories/task_repository.dart';
 
 class StreamTasks {
   StreamTasks(this.repository);

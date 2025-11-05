@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:task_app/features/projects/domain/entities/project_entity.dart';
+import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
 
 class ProjectModel extends ProjectEntity {
   ProjectModel({

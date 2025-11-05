@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:task_app/core/routes/routes.dart';
-import 'package:task_app/core/utils/app_snackbar.dart';
-import 'package:task_app/core/widgets/primart_text.dart';
-import 'package:task_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:task_app/features/auth/presentation/widgets/auth_button.dart';
-import 'package:task_app/features/auth/presentation/widgets/auth_logo.dart';
-import 'package:task_app/features/auth/presentation/widgets/auth_rich_text.dart';
-import 'package:task_app/features/auth/presentation/widgets/auth_textfield.dart';
+import 'package:project_pipeline/core/routes/routes.dart';
+import 'package:project_pipeline/core/utils/app_snackbar.dart';
+import 'package:project_pipeline/core/widgets/primart_text.dart';
+import 'package:project_pipeline/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:project_pipeline/features/auth/presentation/widgets/auth_button.dart';
+import 'package:project_pipeline/features/auth/presentation/widgets/auth_divider.dart';
+import 'package:project_pipeline/features/auth/presentation/widgets/auth_google.dart';
+import 'package:project_pipeline/features/auth/presentation/widgets/auth_logo.dart';
+import 'package:project_pipeline/features/auth/presentation/widgets/auth_rich_text.dart';
+import 'package:project_pipeline/features/auth/presentation/widgets/auth_textfield.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -23,7 +25,6 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   
   bool _obscurePassword = true;
-  bool _isLoading = false;
   String? _lastSnackMessage;
 
   @override
@@ -104,27 +105,20 @@ class _LoginPageState extends State<LoginPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  SizedBox(height: 100.h),
+                  SizedBox(height: 50.h),
                   
                   // Logo and App Name
                   const AuthLogo(),
                   
-                  SizedBox(height: 80.h),
-                  
+                  SizedBox(height: 20.h),
                   // Sign In Title
-                  PrimaryText(
-                    text: 'Sign In',
-                    size: 32.sp,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.secondary,
-                  ),
                   
                   SizedBox(height: 15.h),
                   AuthRichText(
                     firstWord: 'Plan',
                     secondWord: 'Execute',
                     thirdWord: 'Achieve',
-                    fontSize: 16,
+                    fontSize: 25.sp,
                   ),
                   SizedBox(height: 20.h),
                   
@@ -159,7 +153,7 @@ class _LoginPageState extends State<LoginPage> {
                   BlocBuilder<AuthBloc, AuthState>(
                     builder: (context, state) {
                       return AuthButton(
-                        text: 'Sign In',
+                        text: 'Login',
                         onPressed: state is AuthLoading ? null : _handleSignin,
                         isLoading: state is AuthLoading,
                       );
@@ -167,7 +161,21 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   
                   SizedBox(height: 40.h),
-                  
+
+                  AuthDivider(),
+                  SizedBox(height: 10.h),
+                  BlocBuilder<AuthBloc, AuthState>(
+                    builder: (context, state) {
+                      return GoogleButton(
+                        onTap: state is AuthLoading 
+                          ? null 
+                          : () {
+                              context.read<AuthBloc>().add(GoogleSignInRequested());
+                            },
+                      );
+                    },
+                  ),
+                  SizedBox(height: 10.h),
                   // Sign Up Link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:task_app/core/theme/app_pallete.dart';
+import 'package:project_pipeline/core/theme/app_pallete.dart';
 
 class PrimaryText extends StatelessWidget {
   final TextDecoration? decoration;

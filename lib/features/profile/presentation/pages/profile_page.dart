@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:task_app/core/theme/app_pallete.dart';
-import 'package:task_app/core/widgets/primart_text.dart';
-import 'package:task_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:task_app/core/routes/routes.dart';
+import 'package:project_pipeline/core/theme/app_pallete.dart';
+import 'package:project_pipeline/core/widgets/primart_text.dart';
+import 'package:project_pipeline/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:project_pipeline/core/routes/routes.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     String username = 'User';
@@ -75,11 +80,13 @@ class ProfilePage extends StatelessWidget {
               if (state is AuthUnauthenticated) {
                 // Navigate to login and remove all previous routes
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  Navigator.of(context, rootNavigator: true)
-                      .pushNamedAndRemoveUntil(
-                    AppRoutes.authWrapper,
-                    (route) => false,
-                  );
+                  if (mounted && context.mounted) {
+                    Navigator.of(context, rootNavigator: true)
+                        .pushNamedAndRemoveUntil(
+                      AppRoutes.authWrapper,
+                      (route) => false,
+                    );
+                  }
                 });
               }
             },

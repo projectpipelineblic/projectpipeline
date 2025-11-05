@@ -1,14 +1,15 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:task_app/core/services/connectivity_service.dart';
-import 'package:task_app/core/services/local_storage_service.dart';
-import 'package:task_app/core/usecase/usecase.dart';
-import 'package:task_app/core/utils/error_mapper.dart';
-import 'package:task_app/features/auth/domain/entities/user_entity.dart';
-import 'package:task_app/features/auth/domain/usecases/signup_usecase.dart';
-import 'package:task_app/features/auth/domain/usecases/signin_usecase.dart';
-import 'package:task_app/features/auth/domain/usecases/auth_usecases.dart';
-import 'package:task_app/features/auth/domain/usecases/update_username_usecase.dart';
+import 'package:project_pipeline/core/services/connectivity_service.dart';
+import 'package:project_pipeline/core/services/local_storage_service.dart';
+import 'package:project_pipeline/core/usecase/usecase.dart';
+import 'package:project_pipeline/core/utils/error_mapper.dart';
+import 'package:project_pipeline/features/auth/domain/entities/user_entity.dart';
+import 'package:project_pipeline/features/auth/domain/usecases/signup_usecase.dart';
+import 'package:project_pipeline/features/auth/domain/usecases/signin_usecase.dart';
+import 'package:project_pipeline/features/auth/domain/usecases/auth_usecases.dart';
+import 'package:project_pipeline/features/auth/domain/usecases/update_username_usecase.dart';
+import 'package:project_pipeline/features/auth/domain/usecases/google_signin_usecase.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -16,6 +17,7 @@ part 'auth_state.dart';
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final SignUpWithEmailAndPassword _signUpWithEmailAndPassword;
   final SignInWithEmailAndPassword _signInWithEmailAndPassword;
+  final GoogleSignIn _googleSignIn;
   final GetCurrentUser _getCurrentUser;
   final SignOut _signOut;
   final UpdateUsernameUsecase _updateUsernameUsecase;
@@ -25,6 +27,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   AuthBloc({
     required SignUpWithEmailAndPassword signUpWithEmailAndPassword,
     required SignInWithEmailAndPassword signInWithEmailAndPassword,
+    required GoogleSignIn googleSignIn,
     required GetCurrentUser getCurrentUser,
     required SignOut signOut,
     required UpdateUsernameUsecase updateUsernameUsecase,
@@ -32,6 +35,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     required LocalStorageService localStorageService,
   })  : _signUpWithEmailAndPassword = signUpWithEmailAndPassword,
         _signInWithEmailAndPassword = signInWithEmailAndPassword,
+        _googleSignIn = googleSignIn,
         _getCurrentUser = getCurrentUser,
         _signOut = signOut,
         _updateUsernameUsecase = updateUsernameUsecase,
@@ -40,6 +44,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         super(AuthInitial()) {
     on<SignUpRequested>(_onSignUpRequested);
     on<SignInRequested>(_onSignInRequested);
+    on<GoogleSignInRequested>(_onGoogleSignInRequested);
     on<CheckAuthStatusRequested>(_onCheckAuthStatusRequested);
     on<SignOutRequested>(_onSignOutRequested);
     on<UpdateUsernameRequested>(_onUpdateUsernameRequested);
@@ -104,6 +109,39 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(AuthError(authFriendlyMessage(failure.message)));
       },
       (user) async {
+        await _localStorageService.cacheUser(user);
+        emit(AuthSuccess(user));
+      },
+    );
+  }
+
+  Future<void> _onGoogleSignInRequested(
+    GoogleSignInRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    print('🔵 [AuthBloc] Google Sign-In requested');
+    emit(AuthLoading());
+
+    // Check connectivity
+    final isConnected = await _connectivityService.checkConnectivity();
+    if (!isConnected) {
+      print('❌ [AuthBloc] No internet connectivity');
+      emit(const AuthError('Check your internet connectivity'));
+      return;
+    }
+
+    print('🔵 [AuthBloc] Calling Google Sign-In usecase...');
+    final result = await _googleSignIn(NoParams());
+
+    await result.fold(
+      (failure) async {
+        print('❌ [AuthBloc] Google Sign-In failed: ${failure.message}');
+        final friendlyMessage = authFriendlyMessage(failure.message);
+        print('❌ [AuthBloc] Showing user message: $friendlyMessage');
+        emit(AuthError(friendlyMessage));
+      },
+      (user) async {
+        print('✅ [AuthBloc] Google Sign-In successful for user: ${user.userName}');
         await _localStorageService.cacheUser(user);
         emit(AuthSuccess(user));
       },

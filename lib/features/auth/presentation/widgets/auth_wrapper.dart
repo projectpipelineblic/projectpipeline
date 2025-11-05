@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:task_app/core/services/connectivity_service.dart';
-import 'package:task_app/core/widgets/primart_text.dart';
-import 'package:task_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:task_app/features/auth/presentation/pages/login_page.dart';
-import 'package:task_app/features/home/presentation/pages/home_page.dart';
+import 'package:project_pipeline/core/services/connectivity_service.dart';
+import 'package:project_pipeline/core/widgets/primart_text.dart';
+import 'package:project_pipeline/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:project_pipeline/features/auth/presentation/pages/login_page.dart';
+import 'package:project_pipeline/features/home/presentation/pages/home_page.dart';
+
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
