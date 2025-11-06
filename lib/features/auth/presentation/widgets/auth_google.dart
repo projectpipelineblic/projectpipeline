@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:project_pipeline/core/theme/app_pallete.dart';
+import 'package:flutter_svg/svg.dart';
+import 'package:project_pipeline/core/extension/themex.dart';
 import 'package:project_pipeline/core/widgets/secondary_text.dart';
 
 class GoogleButton extends StatelessWidget {
@@ -18,21 +19,19 @@ class GoogleButton extends StatelessWidget {
         height: height,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppPallete.black),
+          border: Border.all(color: context.colors.secondary),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image(
-              image: AssetImage('assets/google.png'),
-              height: 60,
-              width: 60,
-            ),
+            SvgPicture.asset('assets/google.svg', height: 30, width: 30 ),
+            SizedBox(width: 10),
             SecondaryText(
               text: 'Login with Google',
               size: 16,
               fontWeight: FontWeight.w500,
+              color: context.colors.secondary,
             ),
           ],
         ),

@@ -5,15 +5,18 @@ import 'package:project_pipeline/core/extension/themex.dart';
 import 'package:project_pipeline/core/theme/app_pallete.dart';
 import 'package:project_pipeline/core/widgets/primart_text.dart';
 import 'package:project_pipeline/features/projects/domain/entities/task_entity.dart';
+import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
 
 class KanbanTaskCardWidget extends StatelessWidget {
   final TaskEntity task;
   final VoidCallback? onTap;
+  final ProjectEntity? project;
 
   const KanbanTaskCardWidget({
     super.key,
     required this.task,
     this.onTap,
+    this.project,
   });
 
   Color _getPriorityColor() {
@@ -55,6 +58,47 @@ class KanbanTaskCardWidget extends StatelessWidget {
       return 'Today';
     } else {
       return DateFormat('MMM dd').format(task.dueDate!);
+    }
+  }
+
+  String _getStatusLabel() {
+    // If task has a custom statusName, use it
+    if (task.statusName != null && task.statusName!.isNotEmpty) {
+      return task.statusName!;
+    }
+    
+    // Fall back to default status labels
+    switch (task.status) {
+      case TaskStatus.todo:
+        return 'To Do';
+      case TaskStatus.inProgress:
+        return 'In Progress';
+      case TaskStatus.done:
+        return 'Done';
+    }
+  }
+
+  Color _getStatusColor() {
+    // If task has a custom statusName and project has custom statuses, find the matching color
+    if (task.statusName != null && project?.customStatuses != null) {
+      final matchingStatus = project!.customStatuses!.firstWhere(
+        (status) => status.name == task.statusName,
+        orElse: () => project!.customStatuses!.first,
+      );
+      
+      // Parse hex color
+      final hexColor = matchingStatus.colorHex.replaceAll('#', '');
+      return Color(int.parse('FF$hexColor', radix: 16));
+    }
+    
+    // Fall back to default status colors
+    switch (task.status) {
+      case TaskStatus.todo:
+        return const Color(0xFFF59E0B); // Amber
+      case TaskStatus.inProgress:
+        return const Color(0xFF8B5CF6); // Purple
+      case TaskStatus.done:
+        return const Color(0xFF10B981); // Green
     }
   }
 
@@ -141,7 +185,7 @@ class KanbanTaskCardWidget extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 12),
-            if (task.dueDate != null)
+            if (task.dueDate != null) ...[
               Row(
                 children: [
                   Icon(
@@ -160,7 +204,45 @@ class KanbanTaskCardWidget extends StatelessWidget {
                   ),
                 ],
               ),
-            if (task.dueDate != null) const SizedBox(height: 8),
+              const SizedBox(height: 8),
+            ],
+            // Status chip
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor().withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: _getStatusColor().withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      PrimaryText(
+                        text: _getStatusLabel(),
+                        size: 10,
+                        fontWeight: FontWeight.w600,
+                        color: _getStatusColor(),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Icon(

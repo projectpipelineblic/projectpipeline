@@ -13,6 +13,7 @@ class CreateProjectRequested extends ProjectEvent {
   final String creatorUid;
   final String creatorName;
   final List<Map<String, dynamic>> teamMembers;
+  final List<Map<String, String>>? customStatuses;
 
   const CreateProjectRequested({
     required this.name,
@@ -20,10 +21,11 @@ class CreateProjectRequested extends ProjectEvent {
     required this.creatorUid,
     required this.creatorName,
     required this.teamMembers,
+    this.customStatuses,
   });
 
   @override
-  List<Object?> get props => [name, description, creatorUid, creatorName, teamMembers];
+  List<Object?> get props => [name, description, creatorUid, creatorName, teamMembers, customStatuses];
 }
 
 class GetProjectsRequested extends ProjectEvent {
@@ -69,5 +71,22 @@ class RejectInviteRequested extends ProjectEvent {
 
   @override
   List<Object?> get props => [inviteId];
+}
+
+class UpdateProjectRequested extends ProjectEvent {
+  final String projectId;
+  final String? name;
+  final String? description;
+  final List<Map<String, String>>? customStatuses;
+
+  const UpdateProjectRequested({
+    required this.projectId,
+    this.name,
+    this.description,
+    this.customStatuses,
+  });
+
+  @override
+  List<Object?> get props => [projectId, name, description, customStatuses];
 }
 

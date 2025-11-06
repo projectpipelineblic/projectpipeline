@@ -53,6 +53,15 @@ class InviteAccepted extends ProjectState {}
 
 class InviteRejected extends ProjectState {}
 
+class ProjectUpdated extends ProjectState {
+  final ProjectEntity project;
+
+  const ProjectUpdated({required this.project});
+
+  @override
+  List<Object?> get props => [project];
+}
+
 class ProjectError extends ProjectState {
   final String message;
 

@@ -14,6 +14,7 @@ class TaskEntity extends Equatable {
   final List<String> subTasks;
   final DateTime? dueDate;
   final TaskStatus status;
+  final String? statusName; // Custom status name (e.g., "Review", "Pre-review")
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -28,6 +29,7 @@ class TaskEntity extends Equatable {
     required this.subTasks,
     required this.dueDate,
     required this.status,
+    this.statusName,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -44,6 +46,7 @@ class TaskEntity extends Equatable {
         subTasks,
         dueDate,
         status,
+        statusName,
         createdAt,
         updatedAt,
       ];

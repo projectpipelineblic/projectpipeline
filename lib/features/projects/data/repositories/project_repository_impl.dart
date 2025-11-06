@@ -17,17 +17,27 @@ class ProjectRepositoryImpl implements ProjectRepository {
     required String creatorUid,
     required String creatorName,
     required List<Map<String, dynamic>> teamMembers,
+    List<Map<String, String>>? customStatuses,
   }) async {
     try {
+      print('🔵 [ProjectRepository] Creating project: $name');
+      print('🔍 [ProjectRepository] Custom statuses: $customStatuses');
+      
       final project = await _remoteDatasource.createProject(
         name: name,
         description: description,
         creatorUid: creatorUid,
         creatorName: creatorName,
         teamMembers: teamMembers,
+        customStatuses: customStatuses,
       );
+      
+      print('✅ [ProjectRepository] Project created: ${project.id}');
+      print('🔍 [ProjectRepository] Project has ${project.customStatuses?.length ?? 0} custom statuses');
+      
       return Right(project);
     } catch (e) {
+      print('❌ [ProjectRepository] Error: $e');
       return Left(Failure(message: e.toString()));
     }
   }
@@ -48,6 +58,34 @@ class ProjectRepositoryImpl implements ProjectRepository {
       final projects = await _remoteDatasource.getOpenProjects(userId);
       return Right(projects);
     } catch (e) {
+      return Left(Failure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, ProjectEntity>> updateProject({
+    required String projectId,
+    String? name,
+    String? description,
+    List<Map<String, String>>? customStatuses,
+  }) async {
+    try {
+      print('🔵 [ProjectRepository] Updating project: $projectId');
+      print('🔍 [ProjectRepository] Custom statuses: $customStatuses');
+      
+      final project = await _remoteDatasource.updateProject(
+        projectId: projectId,
+        name: name,
+        description: description,
+        customStatuses: customStatuses,
+      );
+      
+      print('✅ [ProjectRepository] Project updated: ${project.id}');
+      print('🔍 [ProjectRepository] Project has ${project.customStatuses?.length ?? 0} custom statuses');
+      
+      return Right(project);
+    } catch (e) {
+      print('❌ [ProjectRepository] Error: $e');
       return Left(Failure(message: e.toString()));
     }
   }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,6 +9,8 @@ import 'package:project_pipeline/core/widgets/primart_text.dart';
 import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
 import 'package:project_pipeline/features/projects/presentation/pages/task_detail_page.dart';
 import 'package:project_pipeline/features/projects/presentation/shared/task_types.dart';
+import 'package:project_pipeline/features/projects/presentation/widgets/task_filters.dart' as filters;
+import 'package:project_pipeline/features_web/projects/widgets/edit_project_dialog.dart';
 
 class ProjectDetailPage extends StatefulWidget {
   const ProjectDetailPage({super.key, required this.project});
@@ -20,7 +23,8 @@ class ProjectDetailPage extends StatefulWidget {
 
 class _ProjectDetailPageState extends State<ProjectDetailPage> {
   final List<TaskItem> _tasks = <TaskItem>[];
-  TaskStatusFilter _selectedFilter = TaskStatusFilter.all;
+  filters.TaskStatusFilter _selectedFilter = filters.TaskStatusFilter.all;
+  String? _selectedCustomStatusName; // For custom status filtering
   String? _filterAssigneeId;
   TaskPriority? _filterPriority;
   DateTime? _filterDueBefore;
@@ -34,6 +38,16 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   void initState() {
     super.initState();
     _project = widget.project;
+    
+    print('🔍 [ProjectDetailPage] Initialized with project: ${_project.name}');
+    print('🔍 [ProjectDetailPage] Project ID: ${_project.id}');
+    print('🔍 [ProjectDetailPage] Custom statuses: ${_project.customStatuses?.length ?? 0}');
+    if (_project.customStatuses != null) {
+      for (var status in _project.customStatuses!) {
+        print('  - ${status.name} (${status.colorHex})');
+      }
+    }
+    
     _subscribeTasks();
     _subscribeToProject();
   }
@@ -71,6 +85,33 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       if (snapshot.exists && mounted) {
         final data = snapshot.data();
         if (data != null) {
+          print('🔍 [_subscribeToProject] Project data updated from Firestore');
+          print('🔍 [_subscribeToProject] customStatuses in data: ${data['customStatuses']}');
+          
+          // Parse custom statuses
+          List<CustomStatus>? parsedStatuses;
+          if (data.containsKey('customStatuses') && data['customStatuses'] != null) {
+            try {
+              final statusesData = data['customStatuses'] as List<dynamic>;
+              print('🔍 [_subscribeToProject] Parsing ${statusesData.length} custom statuses...');
+              
+              parsedStatuses = statusesData.map((s) {
+                final statusMap = s as Map<String, dynamic>;
+                return CustomStatus(
+                  name: statusMap['name'] as String,
+                  colorHex: statusMap['colorHex'] as String,
+                );
+              }).toList();
+              
+              print('✅ [_subscribeToProject] Parsed ${parsedStatuses.length} custom statuses');
+            } catch (e) {
+              print('❌ [_subscribeToProject] Error parsing custom statuses: $e');
+              parsedStatuses = null;
+            }
+          } else {
+            print('⚠️ [_subscribeToProject] No customStatuses in Firestore data');
+          }
+          
           setState(() {
             _project = ProjectEntity(
               id: snapshot.id,
@@ -105,7 +146,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                           ))
                       .toList() ??
                   [],
+              customStatuses: parsedStatuses,
             );
+            
+            print('✅ [_subscribeToProject] Project updated with ${parsedStatuses?.length ?? 0} custom statuses');
           });
         }
       }
@@ -135,6 +179,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           subTasks: (data['subTasks'] as List?)?.map((e) => e.toString()).toList() ?? <String>[],
           dueDate: (data['dueDate'] as Timestamp?)?.toDate(),
           status: _statusFromString(data['status'] as String? ?? 'todo'),
+          statusName: data['statusName'] as String?,
         );
       }).toList();
       setState(() => _tasks
@@ -177,9 +222,16 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isWeb = kIsWeb;
+    final webBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F7FA);
+    final mobileBg = Theme.of(context).scaffoldBackgroundColor;
+    final backgroundColor = isWeb ? webBg : mobileBg;
+    
     return Scaffold(
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: backgroundColor,
         elevation: 0,
         title: PrimaryText(
           text: _project.name,
@@ -213,6 +265,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             _ProjectHeader(
               project: _project,
               onMembersTap: () => setState(() => _showMembers = !_showMembers),
+              isWeb: isWeb,
+              isDark: isDark,
             ),
             if (_showMembers) ...[
               const SizedBox(height: 12),
@@ -239,15 +293,36 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               ],
             ),
             const SizedBox(height: 12),
-            _TaskFilters(
-              selected: _selectedFilter,
-              onChanged: (f) => setState(() => _selectedFilter = f),
+            Builder(
+              builder: (context) {
+                print('🔍 [ProjectDetail] Rendering filters for project: ${_project.name}');
+                print('🔍 [ProjectDetail] Custom statuses count: ${_project.customStatuses?.length ?? 0}');
+                if (_project.customStatuses != null) {
+                  for (var status in _project.customStatuses!) {
+                    print('  - ${status.name} (${status.colorHex})');
+                  }
+                }
+                
+                return filters.TaskFilters(
+                  selected: _selectedFilter,
+                  onChanged: (f) => setState(() => _selectedFilter = f),
+                  customStatuses: _project.customStatuses,
+                  selectedStatusName: _selectedCustomStatusName,
+                  onStatusNameChanged: (name) {
+                    setState(() {
+                      _selectedCustomStatusName = name;
+                    });
+                  },
+                );
+              },
             ),
             const SizedBox(height: 12),
             _TaskList(
               tasks: _filteredTasks(),
               projectId: _project.id,
               project: _project,
+              isWeb: isWeb,
+              isDark: isDark,
             ),
           ],
         ),
@@ -257,18 +332,33 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   List<TaskItem> _filteredTasks() {
     Iterable<TaskItem> it = _tasks;
-    switch (_selectedFilter) {
-      case TaskStatusFilter.all:
-        break;
-      case TaskStatusFilter.todo:
-        it = it.where((t) => t.status == TaskStatus.todo);
-        break;
-      case TaskStatusFilter.inProgress:
-        it = it.where((t) => t.status == TaskStatus.inProgress);
-        break;
-      case TaskStatusFilter.done:
-        it = it.where((t) => t.status == TaskStatus.done);
-        break;
+    
+    // Handle custom status filtering
+    if (_selectedFilter == filters.TaskStatusFilter.custom && _selectedCustomStatusName != null) {
+      print('🔍 [_filteredTasks] Filtering by custom statusName: $_selectedCustomStatusName');
+      
+      // Filter by exact statusName match
+      it = it.where((t) => t.statusName == _selectedCustomStatusName);
+      
+      print('  -> Found ${it.length} tasks with statusName: $_selectedCustomStatusName');
+    } else {
+      // Handle standard enum filtering
+      switch (_selectedFilter) {
+        case filters.TaskStatusFilter.all:
+          break;
+        case filters.TaskStatusFilter.todo:
+          it = it.where((t) => t.status == TaskStatus.todo && t.statusName == null);
+          break;
+        case filters.TaskStatusFilter.inProgress:
+          it = it.where((t) => t.status == TaskStatus.inProgress && t.statusName == null);
+          break;
+        case filters.TaskStatusFilter.done:
+          it = it.where((t) => t.status == TaskStatus.done && t.statusName == null);
+          break;
+        case filters.TaskStatusFilter.custom:
+          // Custom filter without name - show all
+          break;
+      }
     }
     if (_filterAssigneeId != null && _filterAssigneeId!.isNotEmpty) {
       it = it.where((t) => t.assigneeId == _filterAssigneeId);
@@ -339,6 +429,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       'subTasks': task.subTasks,
       'dueDate': task.dueDate == null ? null : Timestamp.fromDate(task.dueDate!),
       'status': _statusToString(task.status),
+      'statusName': task.statusName, // Save custom status name
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
@@ -412,6 +503,16 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   Future<void> _openEditProjectSheet() async {
+    // Use dialog on web, bottom sheet on mobile
+    if (kIsWeb) {
+      showDialog(
+        context: context,
+        builder: (context) => EditProjectDialog(project: _project),
+      );
+      return;
+    }
+    
+    // Mobile bottom sheet
     final nameCtrl = TextEditingController(text: _project.name);
     final descCtrl = TextEditingController(text: _project.description);
     final List<_InviteRow> inviteRows = <_InviteRow>[];
@@ -776,20 +877,36 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 }
 
 class _ProjectHeader extends StatelessWidget {
-  const _ProjectHeader({required this.project, this.onMembersTap});
+  const _ProjectHeader({
+    required this.project,
+    this.onMembersTap,
+    this.isWeb = false,
+    this.isDark = false,
+  });
 
   final ProjectEntity project;
   final VoidCallback? onMembersTap;
+  final bool isWeb;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    
+    // Web-optimized card colors
+    final cardColor = isWeb
+      ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+      : Theme.of(context).cardTheme.color;
+    
+    final borderColor = isWeb
+      ? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))
+      : Theme.of(context).dividerColor;
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor, width: 1),
-        color: Theme.of(context).cardTheme.color,
+        border: Border.all(color: borderColor, width: 1),
+        color: cardColor,
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1028,107 +1145,43 @@ class _MembersList extends StatelessWidget {
   }
 }
 
-class _TaskFilters extends StatelessWidget {
-  const _TaskFilters({required this.selected, required this.onChanged});
-
-  final TaskStatusFilter selected;
-  final ValueChanged<TaskStatusFilter> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => onChanged(TaskStatusFilter.all),
-            child: _FilterChip(
-              label: 'All',
-              selected: selected == TaskStatusFilter.all,
-              color: colorScheme.primary,
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () => onChanged(TaskStatusFilter.todo),
-            child: _FilterChip(
-              label: 'To Do',
-              selected: selected == TaskStatusFilter.todo,
-              color: AppPallete.orange,
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () => onChanged(TaskStatusFilter.inProgress),
-            child: _FilterChip(
-              label: 'In Progress',
-              selected: selected == TaskStatusFilter.inProgress,
-              color: Colors.amber,
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () => onChanged(TaskStatusFilter.done),
-            child: _FilterChip(
-              label: 'Done',
-              selected: selected == TaskStatusFilter.done,
-              color: Colors.green,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({required this.label, required this.selected, required this.color});
-
-  final String label;
-  final bool selected;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: selected ? color.withOpacity(0.12) : Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: selected ? color.withOpacity(0.5) : Theme.of(context).dividerColor,
-          width: 1,
-        ),
-      ),
-      child: PrimaryText(
-        text: label,
-        size: 12,
-        fontWeight: FontWeight.w600,
-        color: selected ? color : AppPallete.secondary,
-      ),
-    );
-  }
-}
 
 class _TaskList extends StatelessWidget {
-  const _TaskList({required this.tasks, this.projectId, this.project});
+  const _TaskList({
+    required this.tasks,
+    this.projectId,
+    this.project,
+    this.isWeb = false,
+    this.isDark = false,
+  });
 
   final List<TaskItem> tasks;
   final String? projectId;
   final ProjectEntity? project;
+  final bool isWeb;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    
+    // Web-optimized colors
+    final cardColor = isWeb
+      ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+      : Theme.of(context).cardTheme.color;
+    
+    final borderColor = isWeb
+      ? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))
+      : Theme.of(context).dividerColor;
+    
     if (tasks.isEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: Theme.of(context).cardTheme.color,
+          color: cardColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Theme.of(context).dividerColor, width: 1),
+          border: Border.all(color: borderColor, width: 1),
         ),
         child: Center(
           child: PrimaryText(
@@ -1146,10 +1199,18 @@ class _TaskList extends StatelessWidget {
           Container(
             margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
-              color: Theme.of(context).cardTheme.color,
+              color: cardColor,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Theme.of(context).dividerColor, width: 1),
-              boxShadow: [
+              border: Border.all(color: borderColor, width: 1),
+              boxShadow: isWeb ? [
+                BoxShadow(
+                  color: isDark 
+                    ? Colors.black.withOpacity(0.3)
+                    : Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ] : [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.03),
                   blurRadius: 8,
@@ -1163,13 +1224,13 @@ class _TaskList extends StatelessWidget {
                 height: 50,
                 width: 50,
                 decoration: BoxDecoration(
-                  color: _priorityColor(t.priority).withOpacity(0.12),
+                  color: _statusColor(t).withOpacity(0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 alignment: Alignment.center,
                 child: Icon(
                   Icons.checklist,
-                  color: _priorityColor(t.priority),
+                  color: _statusColor(t),
                   size: 25,
                 ),
               ),
@@ -1200,6 +1261,39 @@ class _TaskList extends StatelessWidget {
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
+                    const SizedBox(height: 6),
+                    // Status chip
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _statusColor(t).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: _statusColor(t).withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: _statusColor(t),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          PrimaryText(
+                            text: t.statusName ?? _statusLabel(t.status),
+                            size: 10,
+                            fontWeight: FontWeight.w600,
+                            color: _statusColor(t),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1222,23 +1316,45 @@ class _TaskList extends StatelessWidget {
     );
   }
 
-  // Status color kept for potential future use; currently priority drives the icon UI.
+  // Get color based on task status (custom statuses or default)
+  Color _statusColor(TaskItem task) {
+    // If task has a custom statusName and project has custom statuses, find the matching color
+    if (task.statusName != null && project?.customStatuses != null) {
+      final matchingStatus = project!.customStatuses!.firstWhere(
+        (status) => status.name == task.statusName,
+        orElse: () => project!.customStatuses!.first,
+      );
+      
+      // Parse hex color
+      final hexColor = matchingStatus.colorHex.replaceAll('#', '');
+      return Color(int.parse('FF$hexColor', radix: 16));
+    }
+    
+    // Fall back to default status colors
+    switch (task.status) {
+      case TaskStatus.todo:
+        return const Color(0xFFF59E0B); // Amber
+      case TaskStatus.inProgress:
+        return const Color(0xFF8B5CF6); // Purple
+      case TaskStatus.done:
+        return const Color(0xFF10B981); // Green
+    }
+  }
 
-  Color _priorityColor(TaskPriority p) {
-    switch (p) {
-      case TaskPriority.low:
-        return Colors.green;
-      case TaskPriority.medium:
-        return Colors.amber;
-      case TaskPriority.high:
-        return Colors.red;
+  String _statusLabel(TaskStatus status) {
+    switch (status) {
+      case TaskStatus.todo:
+        return 'To Do';
+      case TaskStatus.inProgress:
+        return 'In Progress';
+      case TaskStatus.done:
+        return 'Done';
     }
   }
 }
 
 // TaskItem and enums are now in shared/task_types.dart
 
-enum TaskStatusFilter { all, todo, inProgress, done }
 
 class _CreateTaskForm extends StatefulWidget {
   const _CreateTaskForm({required this.project, required this.onSubmit});

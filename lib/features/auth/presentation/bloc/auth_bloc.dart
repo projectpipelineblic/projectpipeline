@@ -152,36 +152,47 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     CheckAuthStatusRequested event,
     Emitter<AuthState> emit,
   ) async {
+    print('🔍 [AuthBloc] Checking auth status...');
     emit(AuthLoading());
 
-    final isLoggedIn = await _localStorageService.isUserLoggedIn();
+    // Check connectivity first
+    final isConnected = await _connectivityService.checkConnectivity();
+    print('🔍 [AuthBloc] isConnected: $isConnected');
     
-    if (isLoggedIn) {
+    if (isConnected) {
+      // Always try to get current user from Firebase first (it has its own persistence)
+      print('🔍 [AuthBloc] Fetching current user from Firebase...');
+      final result = await _getCurrentUser(NoParams());
+      await result.fold(
+        (failure) async {
+          print('⚠️ [AuthBloc] Firebase auth failed: ${failure.message}');
+          // Firebase says no user, check local cache as fallback
+          final cachedUser = await _localStorageService.getCachedUser();
+          if (cachedUser != null) {
+            print('📦 [AuthBloc] Using cached user: ${cachedUser.userName}');
+            emit(AuthOffline(cachedUser));
+          } else {
+            print('❌ [AuthBloc] No cached user, user is unauthenticated');
+            emit(AuthUnauthenticated());
+          }
+        },
+        (user) async {
+          print('✅ [AuthBloc] Firebase user fetched: ${user.userName}');
+          await _localStorageService.cacheUser(user);
+          emit(AuthAuthenticated(user));
+        },
+      );
+    } else {
+      // Offline - use cached user
+      print('📡 [AuthBloc] Offline, checking cache...');
       final cachedUser = await _localStorageService.getCachedUser();
       if (cachedUser != null) {
-        final isConnected = await _connectivityService.checkConnectivity();
-        
-        if (isConnected) {
-          // Try to get current user from Firebase
-          final result = await _getCurrentUser(NoParams());
-          await result.fold(
-            (failure) async {
-              emit(AuthOffline(cachedUser));
-            },
-            (user) async {
-              await _localStorageService.cacheUser(user);
-              emit(AuthAuthenticated(user));
-            },
-          );
-        } else {
-          // Offline mode with cached user
-          emit(AuthOffline(cachedUser));
-        }
+        print('📦 [AuthBloc] Using cached user: ${cachedUser.userName}');
+        emit(AuthOffline(cachedUser));
       } else {
+        print('❌ [AuthBloc] No cached user available');
         emit(AuthUnauthenticated());
       }
-    } else {
-      emit(AuthUnauthenticated());
     }
   }
 

@@ -14,30 +14,39 @@ class LocalStorageService {
   static const String _useSystemThemeKey = 'use_system_theme';
 
   Future<void> cacheUser(UserEntity user) async {
+    print('💾 [LocalStorage] Caching user: ${user.userName}');
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userKey, jsonEncode(user.toJson()));
     await prefs.setBool(_isLoggedInKey, true);
+    print('✅ [LocalStorage] User cached successfully');
   }
 
   Future<UserEntity?> getCachedUser() async {
+    print('🔍 [LocalStorage] Getting cached user...');
     final prefs = await SharedPreferences.getInstance();
     final userJson = prefs.getString(_userKey);
+    print('🔍 [LocalStorage] userJson exists: ${userJson != null}');
     
     if (userJson != null) {
       try {
         final userMap = jsonDecode(userJson) as Map<String, dynamic>;
-        return UserEntity.fromJson(userMap);
+        final user = UserEntity.fromJson(userMap);
+        print('✅ [LocalStorage] User retrieved: ${user.userName}');
+        return user;
       } catch (e) {
-        print('Error parsing cached user: $e');
+        print('❌ [LocalStorage] Error parsing cached user: $e');
         return null;
       }
     }
+    print('❌ [LocalStorage] No cached user found');
     return null;
   }
 
   Future<bool> isUserLoggedIn() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_isLoggedInKey) ?? false;
+    final isLoggedIn = prefs.getBool(_isLoggedInKey) ?? false;
+    print('🔍 [LocalStorage] isUserLoggedIn: $isLoggedIn');
+    return isLoggedIn;
   }
 
   Future<void> clearUserCache() async {

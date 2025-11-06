@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:project_pipeline/core/theme/app_pallete.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:project_pipeline/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:project_pipeline/features/projects/presentation/shared/task_types.dart';
 import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
+import 'package:project_pipeline/features/projects/presentation/widgets/edit_task_sheet.dart';
 
 class TaskDetailPage extends StatefulWidget {
   const TaskDetailPage({
@@ -92,6 +94,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         .listen((snapshot) {
       if (!snapshot.exists || !mounted) return;
       final data = snapshot.data()!;
+      print('🔍 [_subscribeToTask] Task data updated - statusName: ${data['statusName']}');
+      
       setState(() {
         _task = TaskItem(
           id: widget.task.id,
@@ -103,6 +107,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           subTasks: const <String>[],
           dueDate: (data['dueDate'] as Timestamp?)?.toDate(),
           status: _statusFromString(data['status'] as String? ?? 'todo'),
+          statusName: data['statusName'] as String?,
         );
 
         // Parse subtasks (supports legacy list<String> or new list<Map>)
@@ -118,7 +123,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 createdByName: '',
               ));
             } else if (entry is Map) {
-              final m = Map<String, dynamic>.from(entry as Map);
+              final m = Map<String, dynamic>.from(entry);
               _subTasks.add(_SubTaskItem(
                 title: m['title'] as String? ?? '',
                 completed: m['completed'] as bool? ?? false,
@@ -156,28 +161,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     }
   }
 
-  Color _priorityColor(TaskPriority p) {
-    switch (p) {
-      case TaskPriority.low:
-        return Colors.green;
-      case TaskPriority.medium:
-        return Colors.amber;
-      case TaskPriority.high:
-        return Colors.red;
-    }
-  }
-
-  Color _statusColor(TaskStatus s) {
-    switch (s) {
-      case TaskStatus.todo:
-        return AppPallete.orange;
-      case TaskStatus.inProgress:
-        return Colors.amber;
-      case TaskStatus.done:
-        return Colors.green;
-    }
-  }
-
   String _priorityLabel(TaskPriority p) {
     switch (p) {
       case TaskPriority.low:
@@ -190,6 +173,12 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   }
 
   String _statusLabel(TaskStatus s) {
+    // If task has a custom statusName, use it
+    if (_task.statusName != null && _task.statusName!.isNotEmpty) {
+      return _task.statusName!;
+    }
+    
+    // Default labels
     switch (s) {
       case TaskStatus.todo:
         return 'To Do';
@@ -250,6 +239,146 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
   String _formatDate(DateTime d) {
     return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  }
+
+  Widget _buildStatusButtons() {
+    // Use custom statuses if available
+    if (widget.project?.customStatuses != null && widget.project!.customStatuses!.isNotEmpty) {
+      final customStatuses = widget.project!.customStatuses!;
+      print('🔍 [TaskDetail] Rendering ${customStatuses.length} custom status buttons');
+      
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: customStatuses.map((status) {
+          // Parse hex color
+          Color statusColor;
+          try {
+            final hexColor = status.colorHex.replaceAll('#', '');
+            statusColor = Color(int.parse('FF$hexColor', radix: 16));
+          } catch (e) {
+            statusColor = const Color(0xFF6366F1);
+          }
+          
+          // Check if this is the current status based on enum mapping
+          TaskStatus mappedStatus;
+          if (status.name.toLowerCase().contains('progress')) {
+            mappedStatus = TaskStatus.inProgress;
+          } else if (status.name.toLowerCase().contains('done') || 
+                     status.name.toLowerCase().contains('complete')) {
+            mappedStatus = TaskStatus.done;
+          } else {
+            mappedStatus = TaskStatus.todo;
+          }
+          
+          final isCurrentStatus = _task.statusName == status.name;
+          
+          return InkWell(
+            onTap: () async {
+              print('🔘 [TaskDetail] Status button clicked: ${status.name}');
+              
+              // Update directly without triggering subtask logic
+              if (widget.projectId.isEmpty || widget.task.id.isEmpty) return;
+              
+              // Optimistic UI update
+              setState(() {
+                _task = TaskItem(
+                  id: _task.id,
+                  title: _task.title,
+                  description: _task.description,
+                  assigneeId: _task.assigneeId,
+                  assigneeName: _task.assigneeName,
+                  priority: _task.priority,
+                  subTasks: _task.subTasks,
+                  dueDate: _task.dueDate,
+                  status: mappedStatus,
+                  statusName: status.name, // Save custom status name
+                );
+              });
+              
+              // Update Firebase with BOTH enum and name
+              try {
+                await FirebaseFirestore.instance
+                    .collection('Projects')
+                    .doc(widget.projectId)
+                    .collection('tasks')
+                    .doc(widget.task.id)
+                    .update({
+                  'status': _statusToString(mappedStatus), // For backward compatibility
+                  'statusName': status.name, // Custom status name
+                  'updatedAt': FieldValue.serverTimestamp(),
+                });
+                print('✅ [TaskDetail] Status updated to: ${status.name} (enum: ${_statusToString(mappedStatus)})');
+              } catch (e) {
+                print('❌ [TaskDetail] Failed to update status: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to update status: $e')),
+                  );
+                }
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: isCurrentStatus 
+                  ? statusColor
+                  : statusColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: statusColor,
+                  width: 2,
+                ),
+              ),
+              child: Text(
+                status.name,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isCurrentStatus ? Colors.white : statusColor,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      );
+    }
+    
+    // Default status buttons
+    print('⚠️ [TaskDetail] Rendering DEFAULT status buttons');
+    return Row(
+      children: [
+        Expanded(
+          child: _StatusButton(
+            label: 'To Do',
+            status: TaskStatus.todo,
+            currentStatus: _task.status,
+            color: AppPallete.orange,
+            onTap: () => _updateStatus(TaskStatus.todo),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _StatusButton(
+            label: 'In Progress',
+            status: TaskStatus.inProgress,
+            currentStatus: _task.status,
+            color: Colors.amber,
+            onTap: () => _updateStatus(TaskStatus.inProgress),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _StatusButton(
+            label: 'Done',
+            status: TaskStatus.done,
+            currentStatus: _task.status,
+            color: Colors.green,
+            onTap: () => _updateStatus(TaskStatus.done),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildProgressBar() {
@@ -371,7 +500,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           'updatedByName': '',
         });
       } else if (entry is Map) {
-        updated.add(Map<String, dynamic>.from(entry as Map));
+        updated.add(Map<String, dynamic>.from(entry));
       }
     }
     updated.add(newItem.toJson());
@@ -442,23 +571,37 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       );
     });
 
-    // Derive task status from subtasks
-    final bool allDone = _subTasks.isNotEmpty && _subTasks.every((s) => s.completed);
-    final bool anyDone = _subTasks.any((s) => s.completed);
-    final TaskStatus derivedStatus = allDone
-        ? TaskStatus.done
-        : (anyDone ? TaskStatus.inProgress : TaskStatus.todo);
+    // Only auto-derive status if NOT using custom statuses
+    TaskStatus? derivedStatus;
+    if (widget.project?.customStatuses == null || widget.project!.customStatuses!.isEmpty) {
+      // Derive task status from subtasks for default workflow
+      final bool allDone = _subTasks.isNotEmpty && _subTasks.every((s) => s.completed);
+      final bool anyDone = _subTasks.any((s) => s.completed);
+      derivedStatus = allDone
+          ? TaskStatus.done
+          : (anyDone ? TaskStatus.inProgress : TaskStatus.todo);
+      print('🔄 [_toggleSubTask] Auto-derived status: ${_statusToString(derivedStatus)}');
+    } else {
+      print('⚠️ [_toggleSubTask] Custom statuses present - NOT auto-deriving status');
+    }
 
     final ref = FirebaseFirestore.instance
         .collection('Projects')
         .doc(widget.projectId)
         .collection('tasks')
         .doc(widget.task.id);
-    await ref.update({
+    
+    final updateData = <String, dynamic>{
       'subTasks': _subTasks.map((e) => e.toJson()).toList(),
-      'status': _statusToString(derivedStatus),
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    };
+    
+    // Only update status if we derived one (default workflow)
+    if (derivedStatus != null) {
+      updateData['status'] = _statusToString(derivedStatus);
+    }
+    
+    await ref.update(updateData);
 
     if (!mounted) return;
     setState(() {
@@ -471,18 +614,147 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         priority: _task.priority,
         subTasks: _task.subTasks,
         dueDate: _task.dueDate,
-        status: derivedStatus,
+        status: derivedStatus ?? _task.status, // Keep current status if not auto-derived
       );
     });
+  }
+
+  Future<void> _openEditTaskSheet() async {
+    if (widget.project == null) return;
+    
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).dialogBackgroundColor,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+        ),
+      ),
+      builder: (context) {
+        final insets = MediaQuery.of(context).viewInsets;
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: 16 + insets.bottom,
+          ),
+          child: EditTaskSheet(
+            project: widget.project!,
+            task: _task,
+            onSubmit: ({
+              required String title,
+              required String description,
+              required String assigneeId,
+              required String assigneeName,
+              required TaskPriority priority,
+              required DateTime? dueDate,
+            }) {
+              _updateTaskDetails(
+                title: title,
+                description: description,
+                assigneeId: assigneeId,
+                assigneeName: assigneeName,
+                priority: priority,
+                dueDate: dueDate,
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  String _priorityToString(TaskPriority p) {
+    switch (p) {
+      case TaskPriority.low:
+        return 'low';
+      case TaskPriority.medium:
+        return 'medium';
+      case TaskPriority.high:
+        return 'high';
+    }
+  }
+
+  Future<void> _updateTaskDetails({
+    required String title,
+    required String description,
+    required String assigneeId,
+    required String assigneeName,
+    required TaskPriority priority,
+    required DateTime? dueDate,
+  }) async {
+    if (widget.projectId.isEmpty || widget.task.id.isEmpty) return;
+    
+    setState(() => _isLoading = true);
+    
+    try {
+      final updateData = <String, dynamic>{
+        'title': title,
+        'description': description,
+        'assigneeId': assigneeId,
+        'assigneeName': assigneeName,
+        'priority': _priorityToString(priority),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (dueDate != null) {
+        updateData['dueDate'] = Timestamp.fromDate(dueDate);
+      } else {
+        updateData['dueDate'] = FieldValue.delete();
+      }
+
+      await FirebaseFirestore.instance
+          .collection('Projects')
+          .doc(widget.projectId)
+          .collection('tasks')
+          .doc(widget.task.id)
+          .update(updateData);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Task updated successfully')),
+      );
+      
+      // Update local state optimistically
+      setState(() {
+        _task = TaskItem(
+          id: _task.id,
+          title: title,
+          description: description,
+          assigneeId: assigneeId,
+          assigneeName: assigneeName,
+          priority: priority,
+          subTasks: _task.subTasks,
+          dueDate: dueDate,
+          status: _task.status,
+        );
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update task: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isWeb = kIsWeb;
+    final webBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F7FA);
+    final mobileBg = Theme.of(context).scaffoldBackgroundColor;
+    final backgroundColor = isWeb ? webBg : mobileBg;
 
     return Scaffold(
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: backgroundColor,
         elevation: 0,
         title: PrimaryText(
           text: _task.title,
@@ -492,6 +764,14 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
               ? const Color(0xFFE5E7EB)
               : AppPallete.secondary,
         ),
+        actions: [
+          if (_isAdmin)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: _openEditTaskSheet,
+              tooltip: 'Edit Task',
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -551,39 +831,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         : AppPallete.secondary,
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatusButton(
-                          label: 'To Do',
-                          status: TaskStatus.todo,
-                          currentStatus: _task.status,
-                          color: AppPallete.orange,
-                          onTap: () => _updateStatus(TaskStatus.todo),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _StatusButton(
-                          label: 'In Progress',
-                          status: TaskStatus.inProgress,
-                          currentStatus: _task.status,
-                          color: Colors.amber,
-                          onTap: () => _updateStatus(TaskStatus.inProgress),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _StatusButton(
-                          label: 'Done',
-                          status: TaskStatus.done,
-                          currentStatus: _task.status,
-                          color: Colors.green,
-                          onTap: () => _updateStatus(TaskStatus.done),
-                        ),
-                      ),
-                    ],
-                  ),
+                  _buildStatusButtons(),
                   const SizedBox(height: 24),
 
                   // Description

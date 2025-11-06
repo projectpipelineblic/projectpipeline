@@ -10,11 +10,19 @@ abstract class ProjectRemoteDatasource {
     required String creatorUid,
     required String creatorName,
     required List<Map<String, dynamic>> teamMembers,
+    List<Map<String, String>>? customStatuses,
   });
 
   Future<List<ProjectEntity>> getProjects(String userId);
 
   Future<List<ProjectEntity>> getOpenProjects(String userId);
+
+  Future<ProjectEntity> updateProject({
+    required String projectId,
+    String? name,
+    String? description,
+    List<Map<String, String>>? customStatuses,
+  });
 
   Future<UserInfo> findUserByEmail(String email);
 
@@ -46,8 +54,12 @@ class ProjectRemoteDatasourceImpl implements ProjectRemoteDatasource {
     required String creatorUid,
     required String creatorName,
     required List<Map<String, dynamic>> teamMembers,
+    List<Map<String, String>>? customStatuses,
   }) async {
     try {
+      print('🔵 [ProjectDatasource] Creating project: $name');
+      print('🔍 [ProjectDatasource] Custom statuses received: $customStatuses');
+      
       final projectRef = _firestore.collection('Projects').doc();
       final projectId = projectRef.id;
       final now = DateTime.now();
@@ -121,6 +133,17 @@ class ProjectRemoteDatasourceImpl implements ProjectRemoteDatasource {
         }
       }
 
+      // Create custom status models
+      List<CustomStatusModel>? statusModels;
+      if (customStatuses != null && customStatuses.isNotEmpty) {
+        statusModels = customStatuses
+            .map((s) => CustomStatusModel(
+                  name: s['name']!,
+                  colorHex: s['colorHex']!,
+                ))
+            .toList();
+      }
+
       // Create project
       final projectModel = ProjectModel(
         id: projectId,
@@ -139,9 +162,10 @@ class ProjectRemoteDatasourceImpl implements ProjectRemoteDatasource {
                 ))
             .toList(),
         pendingInvites: pendingInvites,
+        customStatuses: statusModels,
       );
 
-      await projectRef.set({
+      final projectData = {
         'id': projectId,
         'name': name,
         'description': description,
@@ -150,7 +174,18 @@ class ProjectRemoteDatasourceImpl implements ProjectRemoteDatasource {
         'createdAt': Timestamp.fromDate(now),
         'members': membersList,
         'pendingInvites': pendingInvites.map((i) => i.toJson()).toList(),
-      });
+      };
+
+      if (customStatuses != null && customStatuses.isNotEmpty) {
+        print('✅ [ProjectDatasource] Adding ${customStatuses.length} custom statuses to project data');
+        projectData['customStatuses'] = customStatuses;
+      } else {
+        print('⚠️ [ProjectDatasource] No custom statuses provided');
+      }
+
+      print('🚀 [ProjectDatasource] Saving to Firestore: ${projectData.keys}');
+      await projectRef.set(projectData);
+      print('✅ [ProjectDatasource] Project saved successfully');
 
       return projectModel;
     } catch (e) {
@@ -161,6 +196,8 @@ class ProjectRemoteDatasourceImpl implements ProjectRemoteDatasource {
   @override
   Future<List<ProjectEntity>> getProjects(String userId) async {
     try {
+      print('🔵 [ProjectDatasource] Getting projects for user: $userId');
+      
       // Get all projects and filter client-side since Firestore doesn't support
       // array-contains queries on nested fields easily
       final projectsQuery = await _firestore.collection('Projects').get();
@@ -175,6 +212,14 @@ class ProjectRemoteDatasourceImpl implements ProjectRemoteDatasource {
           .map((doc) {
             final data = doc.data();
             data['id'] = doc.id;
+            
+            // Log custom statuses for debugging
+            if (data.containsKey('customStatuses')) {
+              print('✅ [ProjectDatasource] Project "${data['name']}" has custom statuses: ${data['customStatuses']}');
+            } else {
+              print('⚠️ [ProjectDatasource] Project "${data['name']}" has NO custom statuses');
+            }
+            
             return ProjectModel.fromJson(data);
           })
           .toList();
@@ -220,6 +265,54 @@ class ProjectRemoteDatasourceImpl implements ProjectRemoteDatasource {
       return openProjects;
     } catch (e) {
       throw Exception('Error getting open projects: $e');
+    }
+  }
+
+  @override
+  Future<ProjectEntity> updateProject({
+    required String projectId,
+    String? name,
+    String? description,
+    List<Map<String, String>>? customStatuses,
+  }) async {
+    try {
+      print('🔵 [ProjectDatasource] Updating project: $projectId');
+      print('🔍 [ProjectDatasource] Custom statuses: $customStatuses');
+      
+      final projectRef = _firestore.collection('Projects').doc(projectId);
+      
+      // Build update data
+      final Map<String, dynamic> updateData = {};
+      
+      if (name != null) {
+        updateData['name'] = name;
+      }
+      
+      if (description != null) {
+        updateData['description'] = description;
+      }
+      
+      if (customStatuses != null) {
+        print('✅ [ProjectDatasource] Updating ${customStatuses.length} custom statuses');
+        updateData['customStatuses'] = customStatuses;
+      }
+      
+      print('🚀 [ProjectDatasource] Updating fields: ${updateData.keys}');
+      await projectRef.update(updateData);
+      print('✅ [ProjectDatasource] Project updated successfully');
+      
+      // Fetch and return updated project
+      final snapshot = await projectRef.get();
+      if (snapshot.exists) {
+        final data = snapshot.data()!;
+        data['id'] = snapshot.id;
+        return ProjectModel.fromJson(data);
+      } else {
+        throw Exception('Project not found after update');
+      }
+    } catch (e) {
+      print('❌ [ProjectDatasource] Error updating project: $e');
+      throw Exception('Error updating project: $e');
     }
   }
 

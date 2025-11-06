@@ -16,6 +16,7 @@ import 'package:project_pipeline/features/projects/data/repositories/project_rep
 import 'package:project_pipeline/features/projects/domain/repositories/project_repository.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/create_project_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/get_projects_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/update_project_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/find_user_by_email_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/send_team_invite_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/get_invites_usecase.dart';
@@ -99,6 +100,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => CreateProject(sl()));
   sl.registerLazySingleton(() => GetProjects(sl()));
   sl.registerLazySingleton(() => GetOpenProjects(sl()));
+  sl.registerLazySingleton(() => UpdateProject(sl()));
   sl.registerLazySingleton(() => FindUserByEmail(sl()));
   sl.registerLazySingleton(() => SendTeamInvite(sl()));
   sl.registerLazySingleton(() => GetInvites(sl()));
@@ -117,6 +119,7 @@ Future<void> init() async {
     getInvites: sl(),
     acceptInvite: sl(),
     rejectInvite: sl(),
+    updateProject: sl(),
   ));
   sl.registerFactory(() => TaskBloc(
         streamTasks: sl(),

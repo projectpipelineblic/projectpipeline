@@ -11,9 +11,35 @@ class ProjectModel extends ProjectEntity {
     required super.createdAt,
     required super.members,
     required super.pendingInvites,
+    super.customStatuses,
   });
 
   factory ProjectModel.fromJson(Map<String, dynamic> json) {
+    print('🔍 [ProjectModel.fromJson] Parsing project: ${json['name']}');
+    print('🔍 [ProjectModel.fromJson] Raw customStatuses from JSON: ${json['customStatuses']}');
+    print('🔍 [ProjectModel.fromJson] customStatuses type: ${json['customStatuses']?.runtimeType}');
+    
+    List<CustomStatusModel>? parsedStatuses;
+    if (json.containsKey('customStatuses') && json['customStatuses'] != null) {
+      try {
+        final statusesData = json['customStatuses'] as List<dynamic>;
+        print('🔍 [ProjectModel.fromJson] Parsing ${statusesData.length} statuses...');
+        
+        parsedStatuses = statusesData.map((s) {
+          final statusMap = s as Map<String, dynamic>;
+          print('  - Parsing status: ${statusMap['name']} (${statusMap['colorHex']})');
+          return CustomStatusModel.fromJson(statusMap);
+        }).toList();
+        
+        print('✅ [ProjectModel.fromJson] Successfully parsed ${parsedStatuses.length} custom statuses');
+      } catch (e) {
+        print('❌ [ProjectModel.fromJson] Error parsing custom statuses: $e');
+        parsedStatuses = null;
+      }
+    } else {
+      print('⚠️ [ProjectModel.fromJson] No customStatuses field in JSON');
+    }
+    
     return ProjectModel(
       id: json['id'] as String?,
       name: json['name'] as String,
@@ -31,6 +57,7 @@ class ProjectModel extends ProjectEntity {
               ?.map((i) => ProjectInviteModel.fromJson(i as Map<String, dynamic>))
               .toList() ??
           [],
+      customStatuses: parsedStatuses,
     );
   }
 
@@ -46,6 +73,10 @@ class ProjectModel extends ProjectEntity {
       'pendingInvites': pendingInvites
           .map((i) => (i as ProjectInviteModel).toJson())
           .toList(),
+      if (customStatuses != null)
+        'customStatuses': customStatuses!
+            .map((s) => (s as CustomStatusModel).toJson())
+            .toList(),
     };
   }
 }
@@ -130,3 +161,23 @@ class ProjectInviteModel extends ProjectInvite {
   }
 }
 
+class CustomStatusModel extends CustomStatus {
+  const CustomStatusModel({
+    required super.name,
+    required super.colorHex,
+  });
+
+  factory CustomStatusModel.fromJson(Map<String, dynamic> json) {
+    return CustomStatusModel(
+      name: json['name'] as String,
+      colorHex: json['colorHex'] as String,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'colorHex': colorHex,
+    };
+  }
+}

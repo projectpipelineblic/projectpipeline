@@ -12,6 +12,7 @@ class TaskItem {
     required this.subTasks,
     required this.dueDate,
     this.status = TaskStatus.todo,
+    this.statusName,
   });
 
   final String id;
@@ -23,6 +24,7 @@ class TaskItem {
   final List<String> subTasks;
   final DateTime? dueDate;
   final TaskStatus status;
+  final String? statusName; // Custom status name (e.g., "Review", "Pre-review")
 
   String get dueDateLabel {
     if (dueDate == null) return '';

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:project_pipeline/core/routes/platform_routes.dart';
 import 'package:project_pipeline/core/routes/routes.dart';
 import 'package:project_pipeline/core/utils/app_snackbar.dart';
 import 'package:project_pipeline/core/widgets/primart_text.dart';
@@ -79,7 +80,7 @@ class _SignupPageState extends State<SignupPage> {
           AppSnackBar.showSuccess(context, 'Account created successfully!');
           Navigator.pushNamedAndRemoveUntil(
             context, 
-            AppRoutes.home, 
+            PlatformRoutes.home, // Platform-aware: /home (mobile) or /web-home (web)
             (route) => false,
           );
         } else if (state is AuthError) {

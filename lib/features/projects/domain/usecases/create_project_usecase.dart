@@ -11,12 +11,16 @@ class CreateProject implements UseCase<ProjectEntity, CreateProjectParams> {
 
   @override
   Future<Either<Failure, ProjectEntity>> call(CreateProjectParams params) async {
+    print('🔵 [CreateProjectUsecase] Creating project: ${params.name}');
+    print('🔍 [CreateProjectUsecase] Custom statuses: ${params.customStatuses}');
+    
     return await repository.createProject(
       name: params.name,
       description: params.description,
       creatorUid: params.creatorUid,
       creatorName: params.creatorName,
       teamMembers: params.teamMembers,
+      customStatuses: params.customStatuses,
     );
   }
 }
@@ -27,6 +31,7 @@ class CreateProjectParams {
   final String creatorUid;
   final String creatorName;
   final List<Map<String, dynamic>> teamMembers;
+  final List<Map<String, String>>? customStatuses;
 
   CreateProjectParams({
     required this.name,
@@ -34,6 +39,7 @@ class CreateProjectParams {
     required this.creatorUid,
     required this.creatorName,
     required this.teamMembers,
+    this.customStatuses,
   });
 }
 

@@ -9,11 +9,19 @@ abstract class ProjectRepository {
     required String creatorUid,
     required String creatorName,
     required List<Map<String, dynamic>> teamMembers,
+    List<Map<String, String>>? customStatuses,
   });
 
   Future<Either<Failure, List<ProjectEntity>>> getProjects(String userId);
 
   Future<Either<Failure, List<ProjectEntity>>> getOpenProjects(String userId);
+
+  Future<Either<Failure, ProjectEntity>> updateProject({
+    required String projectId,
+    String? name,
+    String? description,
+    List<Map<String, String>>? customStatuses,
+  });
 
   Future<Either<Failure, UserInfo>> findUserByEmail(String email);
 

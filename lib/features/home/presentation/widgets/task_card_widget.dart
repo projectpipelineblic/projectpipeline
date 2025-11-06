@@ -57,6 +57,35 @@ class TaskCardWidget extends StatelessWidget {
     }
   }
 
+  String _getStatusLabel() {
+    // If task has a custom statusName, use it
+    if (task.statusName != null && task.statusName!.isNotEmpty) {
+      return task.statusName!;
+    }
+    
+    // Fall back to default status labels
+    switch (task.status) {
+      case task_entity.TaskStatus.todo:
+        return 'To Do';
+      case task_entity.TaskStatus.inProgress:
+        return 'In Progress';
+      case task_entity.TaskStatus.done:
+        return 'Done';
+    }
+  }
+
+  Color _getStatusColor() {
+    // Use default status colors (project context not available here)
+    switch (task.status) {
+      case task_entity.TaskStatus.todo:
+        return const Color(0xFFF59E0B); // Amber
+      case task_entity.TaskStatus.inProgress:
+        return const Color(0xFF8B5CF6); // Purple
+      case task_entity.TaskStatus.done:
+        return const Color(0xFF10B981); // Green
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isOverdue = task.dueDate != null &&
@@ -154,7 +183,40 @@ class TaskCardWidget extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
+            // Status chip
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: _getStatusColor().withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _getStatusColor().withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  PrimaryText(
+                    text: _getStatusLabel(),
+                    size: 11,
+                    fontWeight: FontWeight.w600,
+                    color: _getStatusColor(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Icon(

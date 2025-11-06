@@ -17,7 +17,9 @@ abstract class AuthRemoteDatasource {
 class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: '288891668667-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com', // Add your web client ID here
+  );
 
   @override
   Future<UserEntity> signUpWithEmailAndPassword(UserEntity user) async {
@@ -174,27 +176,44 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
   @override
   Future<UserEntity> getCurrentUser() async {
     try {
-      final User? user = _auth.currentUser;
+      print('🔍 [Datasource] Getting current user...');
+      
+      // Wait for Firebase Auth to initialize by listening to the first auth state
+      // This ensures we get the restored user session after page refresh
+      final User? user = await _auth.authStateChanges().first.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          print('⏱️ [Datasource] Auth state check timed out');
+          return null;
+        },
+      );
+      
+      print('🔍 [Datasource] Auth state user: ${user?.email ?? "null"}');
+      
       if (user != null) {
+        print('🔍 [Datasource] Fetching user data from Firestore...');
         final DocumentSnapshot userDoc = await _firestore.collection('Users').doc(user.uid).get();
         
         if (userDoc.exists) {
           final userData = userDoc.data() as Map<String, dynamic>;
+          print('✅ [Datasource] User data retrieved: ${userData['email']}');
           return UserModel.fromJson(userData);
         } else {
+          print('❌ [Datasource] User document not found in Firestore');
           throw Exception('User data not found');
         }
       } else {
+        print('❌ [Datasource] No user signed in (Firebase returned null)');
         throw Exception('No user signed in');
       }
     } on FirebaseAuthException catch (e) {
-      print('Firebase Auth Error: ${e.code} - ${e.message}');
+      print('❌ [Datasource] Firebase Auth Error: ${e.code} - ${e.message}');
       throw Exception('${e.code}: ${e.message}');
     } on FirebaseException catch (e) {
-      print('Firestore Error: ${e.code} - ${e.message}');
+      print('❌ [Datasource] Firestore Error: ${e.code} - ${e.message}');
       throw Exception('${e.code}: ${e.message}');
     } catch (e) {
-      print('Unexpected Error: $e');
+      print('❌ [Datasource] Unexpected Error: $e');
       throw Exception('Unexpected Error: $e');
     }
   }

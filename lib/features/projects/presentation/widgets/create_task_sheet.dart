@@ -210,6 +210,13 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     final subTasks = _subTaskCtrls.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
+    
+    // If project has custom statuses, use the first one as default
+    String? defaultStatusName;
+    if (widget.project.customStatuses != null && widget.project.customStatuses!.isNotEmpty) {
+      defaultStatusName = widget.project.customStatuses!.first.name;
+    }
+    
     final entity = TaskEntity(
       id: '',
       projectId: widget.project.id ?? '',
@@ -221,6 +228,7 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
       subTasks: subTasks,
       dueDate: _dueDate,
       status: TaskStatus.todo,
+      statusName: defaultStatusName,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );

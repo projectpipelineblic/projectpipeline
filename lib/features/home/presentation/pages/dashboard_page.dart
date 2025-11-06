@@ -4,8 +4,6 @@ import 'package:project_pipeline/core/di/service_locator.dart';
 import 'package:project_pipeline/core/services/local_storage_service.dart';
 import 'package:project_pipeline/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:project_pipeline/features/home/presentation/bloc/dashboard_bloc.dart';
-import 'package:project_pipeline/features/home/presentation/bloc/dashboard_event.dart';
-import 'package:project_pipeline/features/home/presentation/bloc/dashboard_state.dart';
 import 'package:project_pipeline/features/home/presentation/widgets/dashboard_header_widget.dart';
 import 'package:project_pipeline/features/home/presentation/widgets/todays_tasks_section_widget.dart';
 import 'package:project_pipeline/features/home/presentation/widgets/open_projects_section_widget.dart';
@@ -36,7 +34,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _loadDashboardData() async {
     final user = await sl<LocalStorageService>().getCachedUser();
     if (user != null && user.uid != null) {
-      _dashboardBloc.add(LoadDashboardDataRequested(userId: user.uid!));
+      _dashboardBloc.add(DashboardLoadRequested(user.uid!));
     }
   }
 
@@ -57,14 +55,14 @@ class _DashboardPageState extends State<DashboardPage> {
               builder: (context, state) {
               if (state is DashboardLoading) {
                 return const Center(child: CircularProgressIndicator());
-              } else if (state is DashboardError) {
+              } else if (state is DashboardFailure) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.error_outline, size: 48, color: Colors.red),
                       const SizedBox(height: 16),
-                      Text(state.message),
+                      Text(state.error),
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: _loadDashboardData,
@@ -73,7 +71,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     ],
                   ),
                 );
-              } else if (state is DashboardLoaded) {
+              } else if (state is DashboardSuccess) {
                 return RefreshIndicator(
                   onRefresh: () async => _loadDashboardData(),
                   child: SingleChildScrollView(
@@ -82,9 +80,9 @@ class _DashboardPageState extends State<DashboardPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const DashboardHeaderWidget(),
-                        TodaysTasksSectionWidget(tasks: state.openTasks),
+                        TodaysTasksSectionWidget(tasks: state.tasks),
                         const SizedBox(height: 32),
-                        OpenProjectsSectionWidget(projects: state.openProjects),
+                        OpenProjectsSectionWidget(projects: state.projects),
                         const SizedBox(height: 32),
                       ],
                     ),

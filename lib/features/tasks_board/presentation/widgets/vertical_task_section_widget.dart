@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:project_pipeline/core/widgets/primart_text.dart';
 import 'package:project_pipeline/core/theme/app_pallete.dart';
 import 'package:project_pipeline/features/projects/domain/entities/task_entity.dart';
+import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
 import 'package:project_pipeline/features/tasks_board/presentation/widgets/kanban_task_card_widget.dart';
 
 class VerticalTaskSectionWidget extends StatelessWidget {
@@ -14,6 +15,7 @@ class VerticalTaskSectionWidget extends StatelessWidget {
   final VoidCallback? onDragStart;
   final VoidCallback? onDragEnd;
   final Function(double)? onDragUpdate;
+  final ProjectEntity? project;
 
   const VerticalTaskSectionWidget({
     super.key,
@@ -26,6 +28,7 @@ class VerticalTaskSectionWidget extends StatelessWidget {
     this.onDragStart,
     this.onDragEnd,
     this.onDragUpdate,
+    this.project,
   });
 
   @override
@@ -159,6 +162,7 @@ class VerticalTaskSectionWidget extends StatelessWidget {
                                     width: MediaQuery.of(context).size.width - 64,
                                     child: KanbanTaskCardWidget(
                                       task: task,
+                                      project: project,
                                     ),
                                   ),
                                 ),
@@ -167,6 +171,7 @@ class VerticalTaskSectionWidget extends StatelessWidget {
                                 opacity: 0.3,
                                 child: KanbanTaskCardWidget(
                                   task: task,
+                                  project: project,
                                   onTap: onTaskTap != null
                                       ? () => onTaskTap!(task)
                                       : null,
@@ -174,6 +179,7 @@ class VerticalTaskSectionWidget extends StatelessWidget {
                               ),
                               child: KanbanTaskCardWidget(
                                 task: task,
+                                project: project,
                                 onTap: onTaskTap != null
                                     ? () => onTaskTap!(task)
                                     : null,

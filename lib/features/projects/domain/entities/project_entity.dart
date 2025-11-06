@@ -9,6 +9,7 @@ class ProjectEntity extends Equatable {
   final DateTime createdAt;
   final List<ProjectMember> members;
   final List<ProjectInvite> pendingInvites;
+  final List<CustomStatus>? customStatuses;
 
   const ProjectEntity({
     this.id,
@@ -19,6 +20,7 @@ class ProjectEntity extends Equatable {
     required this.createdAt,
     required this.members,
     required this.pendingInvites,
+    this.customStatuses,
   });
 
   @override
@@ -31,7 +33,21 @@ class ProjectEntity extends Equatable {
         createdAt,
         members,
         pendingInvites,
+        customStatuses,
       ];
+}
+
+class CustomStatus extends Equatable {
+  final String name;
+  final String colorHex;
+
+  const CustomStatus({
+    required this.name,
+    required this.colorHex,
+  });
+
+  @override
+  List<Object?> get props => [name, colorHex];
 }
 
 class ProjectMember extends Equatable {
