@@ -17,6 +17,7 @@ import 'package:project_pipeline/features/projects/domain/repositories/project_r
 import 'package:project_pipeline/features/projects/domain/usecases/create_project_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/get_projects_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/update_project_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/delete_project_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/find_user_by_email_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/send_team_invite_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/get_invites_usecase.dart';
@@ -27,6 +28,7 @@ import 'package:project_pipeline/features/projects/data/datasources/task_remote_
 import 'package:project_pipeline/features/projects/data/repositories/task_repository_impl.dart';
 import 'package:project_pipeline/features/projects/domain/repositories/task_repository.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/stream_tasks_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/stream_user_tasks_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/create_task_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/update_task_status_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/get_user_tasks_usecase.dart';
@@ -35,6 +37,15 @@ import 'package:project_pipeline/features/projects/presentation/bloc/task_bloc.d
 import 'package:project_pipeline/features/home/presentation/bloc/dashboard_bloc.dart';
 import 'package:project_pipeline/features/tasks_board/domain/usecases/get_all_user_tasks_usecase.dart';
 import 'package:project_pipeline/features/tasks_board/presentation/bloc/tasks_board_bloc.dart';
+import 'package:project_pipeline/features/projects/data/datasources/sprint_remote_datasource.dart';
+import 'package:project_pipeline/features/projects/data/repositories/sprint_repository_impl.dart';
+import 'package:project_pipeline/features/projects/domain/repositories/sprint_repository.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/get_sprints_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/create_sprint_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/start_sprint_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/complete_sprint_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/get_active_sprint_usecase.dart';
+import 'package:project_pipeline/features/projects/presentation/bloc/sprint_bloc.dart';
 
 final sl = GetIt.instance;
 
@@ -87,6 +98,9 @@ Future<void> init() async {
   sl.registerLazySingleton<TaskRemoteDataSource>(
     () => TaskRemoteDataSourceImpl(),
   );
+  sl.registerLazySingleton<SprintRemoteDataSource>(
+    () => SprintRemoteDataSourceImpl(),
+  );
 
   // Repositories
   sl.registerLazySingleton<ProjectRepository>(
@@ -95,21 +109,31 @@ Future<void> init() async {
   sl.registerLazySingleton<TaskRepository>(
     () => TaskRepositoryImpl(remote: sl()),
   );
+  sl.registerLazySingleton<SprintRepository>(
+    () => SprintRepositoryImpl(remoteDataSource: sl()),
+  );
 
   // Use Cases
   sl.registerLazySingleton(() => CreateProject(sl()));
   sl.registerLazySingleton(() => GetProjects(sl()));
   sl.registerLazySingleton(() => GetOpenProjects(sl()));
   sl.registerLazySingleton(() => UpdateProject(sl()));
+  sl.registerLazySingleton(() => DeleteProject(sl()));
   sl.registerLazySingleton(() => FindUserByEmail(sl()));
   sl.registerLazySingleton(() => SendTeamInvite(sl()));
   sl.registerLazySingleton(() => GetInvites(sl()));
   sl.registerLazySingleton(() => AcceptInvite(sl()));
   sl.registerLazySingleton(() => RejectInvite(sl()));
   sl.registerLazySingleton(() => StreamTasks(sl()));
+  sl.registerLazySingleton(() => StreamUserTasks(sl()));
   sl.registerLazySingleton(() => GetUserTasks(sl()));
   sl.registerLazySingleton(() => CreateTask(sl()));
   sl.registerLazySingleton(() => UpdateTaskStatus(sl()));
+  sl.registerLazySingleton(() => GetSprints(sl()));
+  sl.registerLazySingleton(() => CreateSprint(sl()));
+  sl.registerLazySingleton(() => StartSprint(sl()));
+  sl.registerLazySingleton(() => CompleteSprint(sl()));
+  sl.registerLazySingleton(() => GetActiveSprint(sl()));
 
   // BLoC
   sl.registerFactory(() => ProjectBloc(
@@ -120,15 +144,24 @@ Future<void> init() async {
     acceptInvite: sl(),
     rejectInvite: sl(),
     updateProject: sl(),
+    deleteProject: sl(),
   ));
   sl.registerFactory(() => TaskBloc(
         streamTasks: sl(),
         createTask: sl(),
         updateTaskStatus: sl(),
       ));
+  sl.registerFactory(() => SprintBloc(
+        getSprints: sl(),
+        createSprint: sl(),
+        startSprint: sl(),
+        completeSprint: sl(),
+        getActiveSprint: sl(),
+      ));
   sl.registerFactory(() => DashboardBloc(
         getUserTasks: sl(),
         getOpenProjects: sl(),
+        streamUserTasks: sl(),
       ));
 
   // ========== Tasks Board Feature ==========

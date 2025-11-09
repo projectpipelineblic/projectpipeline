@@ -10,6 +10,12 @@ class ProjectEntity extends Equatable {
   final List<ProjectMember> members;
   final List<ProjectInvite> pendingInvites;
   final List<CustomStatus>? customStatuses;
+  
+  // Wizard Configuration Fields
+  final String? projectType; // 'Software Development', 'Marketing Campaign', etc.
+  final String? workflowType; // 'kanban', 'scrum', 'list'
+  final String? projectKey; // 'MAR', 'TEST', etc.
+  final Map<String, bool>? additionalFeatures; // time_tracking, task_dependencies, file_attachments
 
   const ProjectEntity({
     this.id,
@@ -21,6 +27,10 @@ class ProjectEntity extends Equatable {
     required this.members,
     required this.pendingInvites,
     this.customStatuses,
+    this.projectType,
+    this.workflowType,
+    this.projectKey,
+    this.additionalFeatures,
   });
 
   @override
@@ -34,6 +44,10 @@ class ProjectEntity extends Equatable {
         members,
         pendingInvites,
         customStatuses,
+        projectType,
+        workflowType,
+        projectKey,
+        additionalFeatures,
       ];
 }
 

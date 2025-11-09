@@ -108,6 +108,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           dueDate: (data['dueDate'] as Timestamp?)?.toDate(),
           status: _statusFromString(data['status'] as String? ?? 'todo'),
           statusName: data['statusName'] as String?,
+          timeSpentMinutes: data['timeSpentMinutes'] as int? ?? 0,
+          startedAt: (data['startedAt'] as Timestamp?)?.toDate(),
         );
 
         // Parse subtasks (supports legacy list<String> or new list<Map>)
@@ -193,7 +195,22 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     if (widget.projectId.isEmpty || widget.task.id.isEmpty) return;
     
     // Optimistic update - update UI immediately without loading spinner
-    setState(() => _task = TaskItem(
+    setState(() {
+      int newTimeSpent = _task.timeSpentMinutes;
+      DateTime? newStartedAt = _task.startedAt;
+      
+      // Update time tracking
+      if (newStatus == TaskStatus.inProgress && _task.status != TaskStatus.inProgress) {
+        newStartedAt = DateTime.now();
+      } else if (_task.status == TaskStatus.inProgress && newStatus != TaskStatus.inProgress) {
+        if (_task.startedAt != null) {
+          final elapsed = DateTime.now().difference(_task.startedAt!);
+          newTimeSpent = _task.timeSpentMinutes + elapsed.inMinutes;
+        }
+        newStartedAt = null;
+      }
+      
+      _task = TaskItem(
       id: _task.id,
       title: _task.title,
       description: _task.description,
@@ -203,19 +220,41 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       subTasks: _task.subTasks,
       dueDate: _task.dueDate,
       status: newStatus,
-    ));
+        timeSpentMinutes: newTimeSpent,
+        startedAt: newStartedAt,
+      );
+    });
     
     // Update Firebase in the background
     try {
+      // Prepare update data
+      final updateData = <String, dynamic>{
+        'status': _statusToString(newStatus),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      
+      // Track time when moving to/from inProgress
+      if (newStatus == TaskStatus.inProgress && _task.status != TaskStatus.inProgress) {
+        // Starting work - set startedAt
+        updateData['startedAt'] = FieldValue.serverTimestamp();
+        print('⏱️ [TaskDetail] Starting timer for task');
+      } else if (_task.status == TaskStatus.inProgress && newStatus != TaskStatus.inProgress) {
+        // Stopping work - calculate and save time spent
+        if (_task.startedAt != null) {
+          final elapsed = DateTime.now().difference(_task.startedAt!);
+          final totalTime = _task.timeSpentMinutes + elapsed.inMinutes;
+          updateData['timeSpentMinutes'] = totalTime;
+          updateData['startedAt'] = null; // Clear startedAt
+          print('⏱️ [TaskDetail] Stopping timer. Total time: ${totalTime} minutes');
+        }
+      }
+      
       await FirebaseFirestore.instance
           .collection('Projects')
           .doc(widget.projectId)
           .collection('tasks')
           .doc(widget.task.id)
-          .update({
-        'status': _statusToString(newStatus),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+          .update(updateData);
       // Success - the snapshot listener will update the UI if needed
     } catch (e) {
       if (!mounted) return;
@@ -282,6 +321,20 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
               
               // Optimistic UI update
               setState(() {
+                int newTimeSpent = _task.timeSpentMinutes;
+                DateTime? newStartedAt = _task.startedAt;
+                
+                // Update time tracking
+                if (mappedStatus == TaskStatus.inProgress && _task.status != TaskStatus.inProgress) {
+                  newStartedAt = DateTime.now();
+                } else if (_task.status == TaskStatus.inProgress && mappedStatus != TaskStatus.inProgress) {
+                  if (_task.startedAt != null) {
+                    final elapsed = DateTime.now().difference(_task.startedAt!);
+                    newTimeSpent = _task.timeSpentMinutes + elapsed.inMinutes;
+                  }
+                  newStartedAt = null;
+                }
+                
                 _task = TaskItem(
                   id: _task.id,
                   title: _task.title,
@@ -293,21 +346,42 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   dueDate: _task.dueDate,
                   status: mappedStatus,
                   statusName: status.name, // Save custom status name
+                  timeSpentMinutes: newTimeSpent,
+                  startedAt: newStartedAt,
                 );
               });
               
               // Update Firebase with BOTH enum and name
               try {
+                // Prepare update data
+                final updateData = <String, dynamic>{
+                  'status': _statusToString(mappedStatus), // For backward compatibility
+                  'statusName': status.name, // Custom status name
+                  'updatedAt': FieldValue.serverTimestamp(),
+                };
+                
+                // Track time when moving to/from inProgress
+                if (mappedStatus == TaskStatus.inProgress && _task.status != TaskStatus.inProgress) {
+                  // Starting work - set startedAt
+                  updateData['startedAt'] = FieldValue.serverTimestamp();
+                  print('⏱️ [TaskDetail] Starting timer for task');
+                } else if (_task.status == TaskStatus.inProgress && mappedStatus != TaskStatus.inProgress) {
+                  // Stopping work - calculate and save time spent
+                  if (_task.startedAt != null) {
+                    final elapsed = DateTime.now().difference(_task.startedAt!);
+                    final totalTime = _task.timeSpentMinutes + elapsed.inMinutes;
+                    updateData['timeSpentMinutes'] = totalTime;
+                    updateData['startedAt'] = null; // Clear startedAt
+                    print('⏱️ [TaskDetail] Stopping timer. Total time: ${totalTime} minutes');
+                  }
+                }
+                
                 await FirebaseFirestore.instance
                     .collection('Projects')
                     .doc(widget.projectId)
                     .collection('tasks')
                     .doc(widget.task.id)
-                    .update({
-                  'status': _statusToString(mappedStatus), // For backward compatibility
-                  'statusName': status.name, // Custom status name
-                  'updatedAt': FieldValue.serverTimestamp(),
-                });
+                    .update(updateData);
                 print('✅ [TaskDetail] Status updated to: ${status.name} (enum: ${_statusToString(mappedStatus)})');
               } catch (e) {
                 print('❌ [TaskDetail] Failed to update status: $e');
@@ -545,6 +619,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           subTasks: _task.subTasks,
           dueDate: dueDate,
           status: _task.status,
+          timeSpentMinutes: _task.timeSpentMinutes,
+          startedAt: _task.startedAt,
         );
       });
     } catch (e) {
@@ -615,6 +691,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         subTasks: _task.subTasks,
         dueDate: _task.dueDate,
         status: derivedStatus ?? _task.status, // Keep current status if not auto-derived
+        timeSpentMinutes: _task.timeSpentMinutes,
+        startedAt: _task.startedAt,
       );
     });
   }
@@ -730,6 +808,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           subTasks: _task.subTasks,
           dueDate: dueDate,
           status: _task.status,
+          timeSpentMinutes: _task.timeSpentMinutes,
+          startedAt: _task.startedAt,
         );
       });
     } catch (e) {

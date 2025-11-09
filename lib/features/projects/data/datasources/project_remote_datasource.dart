@@ -11,6 +11,10 @@ abstract class ProjectRemoteDatasource {
     required String creatorName,
     required List<Map<String, dynamic>> teamMembers,
     List<Map<String, String>>? customStatuses,
+    String? projectType,
+    String? workflowType,
+    String? projectKey,
+    Map<String, bool>? additionalFeatures,
   });
 
   Future<List<ProjectEntity>> getProjects(String userId);
@@ -42,6 +46,8 @@ abstract class ProjectRemoteDatasource {
   Future<void> acceptInvite(String inviteId);
 
   Future<void> rejectInvite(String inviteId);
+
+  Future<void> deleteProject(String projectId);
 }
 
 class ProjectRemoteDatasourceImpl implements ProjectRemoteDatasource {
@@ -55,6 +61,10 @@ class ProjectRemoteDatasourceImpl implements ProjectRemoteDatasource {
     required String creatorName,
     required List<Map<String, dynamic>> teamMembers,
     List<Map<String, String>>? customStatuses,
+    String? projectType,
+    String? workflowType,
+    String? projectKey,
+    Map<String, bool>? additionalFeatures,
   }) async {
     try {
       print('🔵 [ProjectDatasource] Creating project: $name');
@@ -163,6 +173,10 @@ class ProjectRemoteDatasourceImpl implements ProjectRemoteDatasource {
             .toList(),
         pendingInvites: pendingInvites,
         customStatuses: statusModels,
+        projectType: projectType,
+        workflowType: workflowType,
+        projectKey: projectKey,
+        additionalFeatures: additionalFeatures,
       );
 
       final projectData = {
@@ -181,6 +195,24 @@ class ProjectRemoteDatasourceImpl implements ProjectRemoteDatasource {
         projectData['customStatuses'] = customStatuses;
       } else {
         print('⚠️ [ProjectDatasource] No custom statuses provided');
+      }
+      
+      // Add wizard configuration fields
+      if (projectType != null) {
+        projectData['projectType'] = projectType;
+        print('✅ [ProjectDatasource] Adding projectType: $projectType');
+      }
+      if (workflowType != null) {
+        projectData['workflowType'] = workflowType;
+        print('✅ [ProjectDatasource] Adding workflowType: $workflowType');
+      }
+      if (projectKey != null) {
+        projectData['projectKey'] = projectKey;
+        print('✅ [ProjectDatasource] Adding projectKey: $projectKey');
+      }
+      if (additionalFeatures != null) {
+        projectData['additionalFeatures'] = additionalFeatures;
+        print('✅ [ProjectDatasource] Adding additionalFeatures: $additionalFeatures');
       }
 
       print('🚀 [ProjectDatasource] Saving to Firestore: ${projectData.keys}');
@@ -456,6 +488,39 @@ class ProjectRemoteDatasourceImpl implements ProjectRemoteDatasource {
       });
     } catch (e) {
       throw Exception('Error rejecting invite: $e');
+    }
+  }
+
+  @override
+  Future<void> deleteProject(String projectId) async {
+    try {
+      print('🗑️ [ProjectDatasource] Deleting project: $projectId');
+      
+      final batch = _firestore.batch();
+      
+      // Delete all tasks in the project
+      final tasksSnapshot = await _firestore
+          .collection('Projects')
+          .doc(projectId)
+          .collection('tasks')
+          .get();
+      
+      print('🗑️ [ProjectDatasource] Found ${tasksSnapshot.docs.length} tasks to delete');
+      
+      for (final taskDoc in tasksSnapshot.docs) {
+        batch.delete(taskDoc.reference);
+      }
+      
+      // Delete the project itself
+      batch.delete(_firestore.collection('Projects').doc(projectId));
+      
+      // Commit the batch
+      await batch.commit();
+      
+      print('✅ [ProjectDatasource] Project and all tasks deleted');
+    } catch (e) {
+      print('❌ [ProjectDatasource] Error deleting project: $e');
+      throw Exception('Error deleting project: $e');
     }
   }
 }

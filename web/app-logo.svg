@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Project Pipeline icon">
+  <!-- Purple rounded square background -->
+  <rect x="0" y="0" width="1024" height="1024" rx="160" ry="160" fill="#6C5CE7"></rect>
+  <!-- White checkmark (stroke-based for crisp scaling) -->
+  <path d="M265 540 L420 700 L760 300" fill="none" stroke="#FFFFFF" stroke-width="120" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>

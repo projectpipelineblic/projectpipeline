@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/get_user_tasks_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/get_open_projects_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/stream_user_tasks_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/entities/task_entity.dart';
 import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
 
@@ -68,10 +70,14 @@ class DashboardFailure extends DashboardState {
 class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   final GetUserTasks getUserTasks;
   final GetOpenProjects getOpenProjects;
+  final StreamUserTasks streamUserTasks;
+  
+  List<ProjectEntity> _cachedProjects = [];
 
   DashboardBloc({
     required this.getUserTasks,
     required this.getOpenProjects,
+    required this.streamUserTasks,
   }) : super(DashboardInitial()) {
     on<DashboardLoadRequested>(_onLoad);
     on<DashboardRefreshRequested>(_onRefresh);
@@ -82,68 +88,83 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     Emitter<DashboardState> emit,
   ) async {
     emit(DashboardLoading());
-    await _loadData(event.userId, emit);
+    
+    // Load initial data first
+    await _loadProjects(event.userId);
+    
+    // Load initial tasks
+    final initialTasksResult = await getUserTasks(GetUserTasksParams(userId: event.userId));
+    List<TaskEntity> initialTasks = [];
+    initialTasksResult.fold(
+      (failure) => emit(DashboardFailure(failure.message)),
+      (tasks) => initialTasks = List<TaskEntity>.from(tasks),
+    );
+    
+    // If we got initial data, emit success state
+    if (initialTasksResult.isRight()) {
+      emit(DashboardSuccess(
+        projects: _cachedProjects,
+        tasks: initialTasks,
+      ));
+    }
+    
+    // Then subscribe to real-time updates using emit.forEach
+    // This keeps the event handler alive and allows emitting from stream
+    await emit.forEach(
+      streamUserTasks(event.userId),
+      onData: (tasks) {
+        // Update state with new tasks from stream
+        return DashboardSuccess(
+          projects: _cachedProjects,
+          tasks: tasks,
+        );
+      },
+      onError: (error, stackTrace) {
+        return DashboardFailure('Failed to load tasks: $error');
+      },
+    );
   }
 
   Future<void> _onRefresh(
     DashboardRefreshRequested event,
     Emitter<DashboardState> emit,
   ) async {
-    // Don't emit loading state on refresh to avoid UI flash
-    await _loadData(event.userId, emit);
-  }
-
-  Future<void> _loadData(
-    String userId,
-    Emitter<DashboardState> emit,
-  ) async {
-    try {
-      // Fetch data in parallel for faster loading
-      final results = await Future.wait([
-        getUserTasks(GetUserTasksParams(userId: userId)),
-        getOpenProjects(GetOpenProjectsParams(userId: userId)),
-      ]);
-
-      final tasksResult = results[0];
-      final projectsResult = results[1];
-
-      // Check for failures
-      if (tasksResult.isLeft()) {
+    // Reload projects and tasks, then resubscribe
+    await _loadProjects(event.userId);
+    
+    final tasksResult = await getUserTasks(GetUserTasksParams(userId: event.userId));
         tasksResult.fold(
           (failure) => emit(DashboardFailure(failure.message)),
-          (_) => null,
+      (tasks) => emit(DashboardSuccess(
+        projects: _cachedProjects,
+        tasks: List<TaskEntity>.from(tasks),
+      )),
+    );
+    
+    // Subscribe to real-time updates using emit.forEach
+    await emit.forEach(
+      streamUserTasks(event.userId),
+      onData: (tasks) {
+        return DashboardSuccess(
+          projects: _cachedProjects,
+          tasks: tasks,
         );
-        return;
-      }
+      },
+      onError: (error, stackTrace) {
+        return DashboardFailure('Failed to load tasks: $error');
+      },
+    );
+  }
 
-      if (projectsResult.isLeft()) {
-        projectsResult.fold(
-          (failure) => emit(DashboardFailure(failure.message)),
-          (_) => null,
-        );
-        return;
-      }
-
-      // Extract successful data
-      List<TaskEntity> tasks = [];
-      List<ProjectEntity> projects = [];
-
-      tasksResult.fold(
-        (_) => null,
-        (data) => tasks = List<TaskEntity>.from(data),
-      );
-
+  Future<void> _loadProjects(String userId) async {
+    try {
+      final projectsResult = await getOpenProjects(GetOpenProjectsParams(userId: userId));
       projectsResult.fold(
         (_) => null,
-        (data) => projects = List<ProjectEntity>.from(data),
+        (projects) => _cachedProjects = List<ProjectEntity>.from(projects),
       );
-
-      emit(DashboardSuccess(
-        projects: projects,
-        tasks: tasks,
-      ));
     } catch (e) {
-      emit(DashboardFailure('Failed to load dashboard: $e'));
+      // Handle error silently, will be shown when emitting state
     }
   }
 }

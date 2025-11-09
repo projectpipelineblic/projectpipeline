@@ -7,7 +7,7 @@ import 'package:project_pipeline/features/projects/presentation/bloc/project_blo
 import 'package:project_pipeline/features/projects/presentation/bloc/project_event.dart';
 import 'package:project_pipeline/features/projects/presentation/bloc/project_state.dart';
 import 'package:project_pipeline/features_web/projects/widgets/web_project_grid_card.dart';
-import 'package:project_pipeline/features_web/projects/widgets/create_project_dialog.dart';
+import 'package:project_pipeline/features_web/projects/widgets/create_project_wizard.dart';
 
 class WebProjectsPage extends StatefulWidget {
   const WebProjectsPage({super.key});
@@ -20,14 +20,33 @@ class _WebProjectsPageState extends State<WebProjectsPage> {
   @override
   void initState() {
     super.initState();
+    _loadProjects();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload projects when page is revisited
+    _loadProjects();
+  }
+
+  void _loadProjects() {
     final authState = context.read<AuthBloc>().state;
+    String? uid;
+    
     if (authState is AuthSuccess) {
-      final uid = authState.user.uid;
+      uid = authState.user.uid;
+    } else if (authState is AuthAuthenticated) {
+      uid = authState.user.uid;
+    } else if (authState is AuthOffline) {
+      uid = authState.user.uid;
+    }
+    
       if (uid != null && uid.isNotEmpty) {
+      print('🔄 [WebProjects] Loading projects for user: $uid');
         context.read<ProjectBloc>().add(
               GetProjectsRequested(userId: uid),
             );
-      }
     }
   }
 
@@ -35,8 +54,21 @@ class _WebProjectsPageState extends State<WebProjectsPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return BlocBuilder<ProjectBloc, ProjectState>(
+    return BlocListener<ProjectBloc, ProjectState>(
+      listener: (context, state) {
+        // Reload projects after create, update, or delete
+        if (state is ProjectCreated || state is ProjectUpdated || state is ProjectDeleted) {
+          print('🔄 [WebProjects] Project changed, reloading list...');
+          _loadProjects();
+        }
+      },
+      child: BlocBuilder<ProjectBloc, ProjectState>(
       builder: (context, state) {
+          print('🎨 [WebProjects] Building UI with state: ${state.runtimeType}');
+          if (state is ProjectLoaded) {
+            print('🎨 [WebProjects] ProjectLoaded state has ${state.projects.length} projects');
+          }
+          
         return Container(
           color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F7FA),
           child: SingleChildScrollView(
@@ -74,7 +106,7 @@ class _WebProjectsPageState extends State<WebProjectsPage> {
                     onPressed: () {
                       showDialog(
                         context: context,
-                        builder: (context) => const CreateProjectDialog(),
+                        builder: (context) => const CreateProjectWizard(),
                       );
                     },
                     style: ElevatedButton.styleFrom(
@@ -102,8 +134,70 @@ class _WebProjectsPageState extends State<WebProjectsPage> {
               ),
               const Gap(32),
 
-              // Projects Grid
-              if (state is ProjectLoaded) ...[
+              // Loading State
+              if (state is ProjectLoading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(64.0),
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF6366F1),
+                    ),
+                  ),
+                ),
+              
+              // Error State
+              if (state is ProjectError)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(64.0),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 64,
+                          color: Colors.red.withOpacity(0.7),
+                        ),
+                        const Gap(16),
+                        Text(
+                          'Error: ${state.message}',
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            color: Colors.red,
+                          ),
+                        ),
+                        const Gap(16),
+                        ElevatedButton(
+                          onPressed: _loadProjects,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              
+              // Projects Grid or Other States
+              if (state is ProjectCreated || 
+                  state is ProjectUpdated || 
+                  state is ProjectDeleted) ...[
+                // Reload projects after state changes
+                Builder(
+                  builder: (context) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        _loadProjects();
+                      }
+                    });
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(64.0),
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF6366F1),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ] else if (state is ProjectLoaded) ...[
                 if (state.projects.isEmpty)
                   Center(
                     child: Padding(
@@ -137,11 +231,23 @@ class _WebProjectsPageState extends State<WebProjectsPage> {
                     ),
                   )
                 else
-                  GridView.builder(
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Responsive grid columns
+                      int crossAxisCount;
+                      if (constraints.maxWidth > 1200) {
+                        crossAxisCount = 3;
+                      } else if (constraints.maxWidth > 800) {
+                        crossAxisCount = 2;
+                      } else {
+                        crossAxisCount = 1;
+                      }
+
+                      return GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
                       crossAxisSpacing: 20,
                       mainAxisSpacing: 20,
                       childAspectRatio: 1.4,
@@ -153,26 +259,8 @@ class _WebProjectsPageState extends State<WebProjectsPage> {
                         isDark: isDark,
                       );
                     },
-                  ),
-                ] else if (state is ProjectLoading) ...[
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(48.0),
-                    child: CircularProgressIndicator(),
-                  ),
-                ),
-              ] else if (state is ProjectError) ...[
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(48.0),
-                    child: Text(
-                      state.message,
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        color: const Color(0xFF64748B),
-                      ),
-                    ),
-                  ),
+                      );
+                    },
                 ),
               ],
               ],
@@ -180,6 +268,7 @@ class _WebProjectsPageState extends State<WebProjectsPage> {
           ),
         );
       },
+      ),
     );
   }
 }

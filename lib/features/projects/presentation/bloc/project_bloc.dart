@@ -6,6 +6,7 @@ import 'package:project_pipeline/features/projects/domain/usecases/get_invites_u
 import 'package:project_pipeline/features/projects/domain/usecases/accept_invite_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/reject_invite_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/update_project_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/delete_project_usecase.dart';
 import 'package:project_pipeline/features/projects/presentation/bloc/project_event.dart';
 import 'package:project_pipeline/features/projects/presentation/bloc/project_state.dart';
 
@@ -17,6 +18,7 @@ class ProjectBloc extends Bloc<ProjectEvent, ProjectState> {
   final AcceptInvite _acceptInvite;
   final RejectInvite _rejectInvite;
   final UpdateProject _updateProject;
+  final DeleteProject _deleteProject;
 
   ProjectBloc({
     required CreateProject createProject,
@@ -26,6 +28,7 @@ class ProjectBloc extends Bloc<ProjectEvent, ProjectState> {
     required AcceptInvite acceptInvite,
     required RejectInvite rejectInvite,
     required UpdateProject updateProject,
+    required DeleteProject deleteProject,
   })  : _createProject = createProject,
         _getProjects = getProjects,
         _findUserByEmail = findUserByEmail,
@@ -33,6 +36,7 @@ class ProjectBloc extends Bloc<ProjectEvent, ProjectState> {
         _acceptInvite = acceptInvite,
         _rejectInvite = rejectInvite,
         _updateProject = updateProject,
+        _deleteProject = deleteProject,
         super(ProjectInitial()) {
     on<CreateProjectRequested>(_onCreateProjectRequested);
     on<GetProjectsRequested>(_onGetProjectsRequested);
@@ -41,6 +45,7 @@ class ProjectBloc extends Bloc<ProjectEvent, ProjectState> {
     on<AcceptInviteRequested>(_onAcceptInviteRequested);
     on<RejectInviteRequested>(_onRejectInviteRequested);
     on<UpdateProjectRequested>(_onUpdateProjectRequested);
+    on<DeleteProjectRequested>(_onDeleteProjectRequested);
   }
 
   Future<void> _onCreateProjectRequested(
@@ -50,6 +55,9 @@ class ProjectBloc extends Bloc<ProjectEvent, ProjectState> {
     print('🔵 [ProjectBloc] CreateProjectRequested event received');
     print('🔍 [ProjectBloc] Project name: ${event.name}');
     print('🔍 [ProjectBloc] Custom statuses from event: ${event.customStatuses}');
+    print('🔍 [ProjectBloc] Project type: ${event.projectType}');
+    print('🔍 [ProjectBloc] Workflow type: ${event.workflowType}');
+    print('🔍 [ProjectBloc] Project key: ${event.projectKey}');
     
     emit(ProjectLoading());
     final result = await _createProject(
@@ -60,6 +68,10 @@ class ProjectBloc extends Bloc<ProjectEvent, ProjectState> {
         creatorName: event.creatorName,
         teamMembers: event.teamMembers,
         customStatuses: event.customStatuses,
+        projectType: event.projectType,
+        workflowType: event.workflowType,
+        projectKey: event.projectKey,
+        additionalFeatures: event.additionalFeatures,
       ),
     );
 
@@ -80,12 +92,23 @@ class ProjectBloc extends Bloc<ProjectEvent, ProjectState> {
     GetProjectsRequested event,
     Emitter<ProjectState> emit,
   ) async {
+    print('🔵 [ProjectBloc] GetProjectsRequested for user: ${event.userId}');
     emit(ProjectLoading());
     final result = await _getProjects(GetProjectsParams(userId: event.userId));
 
     result.fold(
-      (failure) => emit(ProjectError(message: failure.message)),
-      (projects) => emit(ProjectLoaded(projects: projects)),
+      (failure) {
+        print('❌ [ProjectBloc] Failed to load projects: ${failure.message}');
+        emit(ProjectError(message: failure.message));
+      },
+      (projects) {
+        print('✅ [ProjectBloc] Loaded ${projects.length} projects');
+        for (var project in projects) {
+          print('   📁 Project: ${project.name} (ID: ${project.id})');
+        }
+        emit(ProjectLoaded(projects: projects));
+        print('✅ [ProjectBloc] Emitted ProjectLoaded state');
+      },
     );
   }
 
@@ -169,6 +192,28 @@ class ProjectBloc extends Bloc<ProjectEvent, ProjectState> {
         print('✅ [ProjectBloc] Project updated successfully: ${project.id}');
         print('🔍 [ProjectBloc] Updated project has ${project.customStatuses?.length ?? 0} custom statuses');
         emit(ProjectUpdated(project: project));
+      },
+    );
+  }
+
+  Future<void> _onDeleteProjectRequested(
+    DeleteProjectRequested event,
+    Emitter<ProjectState> emit,
+  ) async {
+    print('🗑️ [ProjectBloc] DeleteProjectRequested event received');
+    print('🔍 [ProjectBloc] Project ID: ${event.projectId}');
+    
+    emit(ProjectLoading());
+    final result = await _deleteProject(event.projectId);
+
+    result.fold(
+      (failure) {
+        print('❌ [ProjectBloc] Project deletion failed: ${failure.message}');
+        emit(ProjectError(message: failure.message));
+      },
+      (_) {
+        print('✅ [ProjectBloc] Project deleted successfully');
+        emit(ProjectDeleted());
       },
     );
   }

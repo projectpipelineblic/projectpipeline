@@ -13,6 +13,9 @@ class CreateProject implements UseCase<ProjectEntity, CreateProjectParams> {
   Future<Either<Failure, ProjectEntity>> call(CreateProjectParams params) async {
     print('🔵 [CreateProjectUsecase] Creating project: ${params.name}');
     print('🔍 [CreateProjectUsecase] Custom statuses: ${params.customStatuses}');
+    print('🔍 [CreateProjectUsecase] Project type: ${params.projectType}');
+    print('🔍 [CreateProjectUsecase] Workflow type: ${params.workflowType}');
+    print('🔍 [CreateProjectUsecase] Project key: ${params.projectKey}');
     
     return await repository.createProject(
       name: params.name,
@@ -21,6 +24,10 @@ class CreateProject implements UseCase<ProjectEntity, CreateProjectParams> {
       creatorName: params.creatorName,
       teamMembers: params.teamMembers,
       customStatuses: params.customStatuses,
+      projectType: params.projectType,
+      workflowType: params.workflowType,
+      projectKey: params.projectKey,
+      additionalFeatures: params.additionalFeatures,
     );
   }
 }
@@ -32,6 +39,10 @@ class CreateProjectParams {
   final String creatorName;
   final List<Map<String, dynamic>> teamMembers;
   final List<Map<String, String>>? customStatuses;
+  final String? projectType;
+  final String? workflowType;
+  final String? projectKey;
+  final Map<String, bool>? additionalFeatures;
 
   CreateProjectParams({
     required this.name,
@@ -40,6 +51,10 @@ class CreateProjectParams {
     required this.creatorName,
     required this.teamMembers,
     this.customStatuses,
+    this.projectType,
+    this.workflowType,
+    this.projectKey,
+    this.additionalFeatures,
   });
 }
 

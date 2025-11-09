@@ -5,10 +5,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:project_pipeline/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:project_pipeline/features/home/presentation/bloc/dashboard_bloc.dart';
+import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
 import 'package:project_pipeline/features_web/home/widgets/web_stat_card.dart';
 import 'package:project_pipeline/features_web/home/widgets/web_project_card.dart';
 import 'package:project_pipeline/features_web/home/widgets/web_task_card.dart';
-import 'package:project_pipeline/features_web/projects/widgets/create_project_dialog.dart';
+import 'package:project_pipeline/features_web/projects/widgets/create_project_wizard.dart';
 
 class WebDashboardPage extends StatefulWidget {
   const WebDashboardPage({super.key});
@@ -45,6 +46,8 @@ class _WebDashboardPageState extends State<WebDashboardPage> {
       userId = authState.user.uid;
     } else if (authState is AuthAuthenticated) {
       userId = authState.user.uid;
+    } else if (authState is AuthOffline) {
+      userId = authState.user.uid;
     }
     
     // Only load if we have a userId and dashboard is not already loaded/loading
@@ -64,6 +67,8 @@ class _WebDashboardPageState extends State<WebDashboardPage> {
       userId = authState.user.uid;
     } else if (authState is AuthAuthenticated) {
       userId = authState.user.uid;
+    } else if (authState is AuthOffline) {
+      userId = authState.user.uid;
     }
     
     if (userId != null && userId.isNotEmpty) {
@@ -80,10 +85,15 @@ class _WebDashboardPageState extends State<WebDashboardPage> {
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, authState) {
           // Reload dashboard when auth state changes to authenticated
-          if (authState is AuthSuccess || authState is AuthAuthenticated) {
-            final userId = authState is AuthSuccess 
-              ? authState.user.uid 
-              : (authState as AuthAuthenticated).user.uid;
+          if (authState is AuthSuccess || authState is AuthAuthenticated || authState is AuthOffline) {
+            String? userId;
+            if (authState is AuthSuccess) {
+              userId = authState.user.uid;
+            } else if (authState is AuthAuthenticated) {
+              userId = authState.user.uid;
+            } else if (authState is AuthOffline) {
+              userId = authState.user.uid;
+            }
             
             if (userId != null && userId.isNotEmpty) {
               // Force reload
@@ -156,7 +166,22 @@ class _WebDashboardPageState extends State<WebDashboardPage> {
                       const Gap(32),
 
                       // Projects and Tasks
-                      Row(
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isNarrow = constraints.maxWidth < 900;
+                          
+                          if (isNarrow) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildProjectsSection(state, isDark),
+                                const Gap(24),
+                                _buildTasksSection(state, isDark),
+                              ],
+                            );
+                          }
+                          
+                          return Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Open Projects
@@ -169,6 +194,8 @@ class _WebDashboardPageState extends State<WebDashboardPage> {
                             child: _buildTasksSection(state, isDark),
                           ),
                         ],
+                          );
+                        },
                       ),
                     ],
                   );
@@ -194,6 +221,8 @@ class _WebDashboardPageState extends State<WebDashboardPage> {
           userName = state.user.userName;
         } else if (state is AuthAuthenticated) {
           userName = state.user.userName;
+        } else if (state is AuthOffline) {
+          userName = state.user.userName;
         }
         
         final greeting = _getGreeting();
@@ -205,7 +234,7 @@ class _WebDashboardPageState extends State<WebDashboardPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '$greeting, $userName!',
+                    '$greeting, $userName',
                     style: GoogleFonts.poppins(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -239,7 +268,7 @@ class _WebDashboardPageState extends State<WebDashboardPage> {
               onPressed: () {
                 showDialog(
                   context: context,
-                  builder: (context) => const CreateProjectDialog(),
+                  builder: (context) => const CreateProjectWizard(),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -261,40 +290,6 @@ class _WebDashboardPageState extends State<WebDashboardPage> {
               ),
             ),
             const Gap(12),
-            // Logout button
-            IconButton(
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (dialogContext) => AlertDialog(
-                    title: const Text('Logout'),
-                    content: const Text('Are you sure you want to logout?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(dialogContext),
-                        child: const Text('Cancel'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          context.read<AuthBloc>().add(SignOutRequested());
-                          Navigator.pop(dialogContext);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('Logout'),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              icon: Icon(
-                Icons.logout,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-              ),
-              tooltip: 'Logout',
-            ),
           ],
         );
       },
@@ -309,6 +304,48 @@ class _WebDashboardPageState extends State<WebDashboardPage> {
   }
 
   Widget _buildStatsRow(DashboardSuccess state, bool isDark) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 600;
+        
+        if (isNarrow) {
+          return Column(
+            children: [
+              WebStatCard(
+                title: 'Total Projects',
+                value: state.totalProjects.toString(),
+                icon: Icons.folder_outlined,
+                color: const Color(0xFF6366F1),
+                isDark: isDark,
+              ),
+              const Gap(12),
+              WebStatCard(
+                title: 'Total Tasks',
+                value: state.totalTasks.toString(),
+                icon: Icons.task_alt_outlined,
+                color: const Color(0xFF8B5CF6),
+                isDark: isDark,
+              ),
+              const Gap(12),
+              WebStatCard(
+                title: 'Completed',
+                value: state.completedTasks.toString(),
+                icon: Icons.check_circle_outline,
+                color: const Color(0xFF10B981),
+                isDark: isDark,
+              ),
+              const Gap(12),
+              WebStatCard(
+                title: 'Pending',
+                value: state.pendingTasks.toString(),
+                icon: Icons.pending_outlined,
+                color: const Color(0xFFF59E0B),
+                isDark: isDark,
+              ),
+            ],
+          );
+        }
+        
     return Row(
       children: [
         Expanded(
@@ -351,6 +388,8 @@ class _WebDashboardPageState extends State<WebDashboardPage> {
           ),
         ),
       ],
+        );
+      },
     );
   }
 
@@ -384,7 +423,7 @@ class _WebDashboardPageState extends State<WebDashboardPage> {
                     onPressed: () {
                       showDialog(
                         context: context,
-                        builder: (context) => const CreateProjectDialog(),
+                        builder: (context) => const CreateProjectWizard(),
                       );
                     },
                     icon: const Icon(Icons.add, size: 16),
@@ -489,13 +528,26 @@ class _WebDashboardPageState extends State<WebDashboardPage> {
               ),
             )
           else
-            ...state.tasks.take(5).map((task) => Padding(
+            ...state.tasks.take(5).map((task) {
+                  // Find the project for this task
+                  ProjectEntity? project;
+                  try {
+                    project = state.projects.firstWhere(
+                      (p) => p.id == task.projectId,
+                    );
+                  } catch (e) {
+                    // Project not found, use null
+                    project = null;
+                  }
+                  return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: WebTaskCard(
                     task: task,
+                      project: project,
                     isDark: isDark,
                   ),
-                )),
+                  );
+                }),
         ],
       ),
     );

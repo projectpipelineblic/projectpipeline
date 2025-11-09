@@ -10,6 +10,10 @@ abstract class ProjectRepository {
     required String creatorName,
     required List<Map<String, dynamic>> teamMembers,
     List<Map<String, String>>? customStatuses,
+    String? projectType,
+    String? workflowType,
+    String? projectKey,
+    Map<String, bool>? additionalFeatures,
   });
 
   Future<Either<Failure, List<ProjectEntity>>> getProjects(String userId);
@@ -41,6 +45,8 @@ abstract class ProjectRepository {
   Future<Either<Failure, void>> acceptInvite(String inviteId);
 
   Future<Either<Failure, void>> rejectInvite(String inviteId);
+
+  Future<Either<Failure, void>> deleteProject(String projectId);
 }
 
 class UserInfo {

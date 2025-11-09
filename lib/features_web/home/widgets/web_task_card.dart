@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:project_pipeline/features/projects/domain/entities/task_entity.dart' as domain;
+import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
 import 'package:project_pipeline/features/projects/presentation/pages/task_detail_page.dart';
 import 'package:project_pipeline/features/projects/presentation/shared/task_types.dart';
 
 class WebTaskCard extends StatelessWidget {
   final domain.TaskEntity task;
+  final ProjectEntity? project;
   final bool isDark;
 
   const WebTaskCard({
     super.key,
     required this.task,
+    this.project,
     this.isDark = false,
   });
 
@@ -31,6 +34,9 @@ class WebTaskCard extends StatelessWidget {
           subTasks: task.subTasks,
           dueDate: task.dueDate,
           status: _convertStatus(task.status),
+          statusName: task.statusName,
+          timeSpentMinutes: task.timeSpentMinutes,
+          startedAt: task.startedAt,
         );
         
         Navigator.push(
@@ -39,6 +45,7 @@ class WebTaskCard extends StatelessWidget {
             builder: (context) => TaskDetailPage(
               task: taskItem,
               projectId: task.projectId,
+              project: project,
             ),
           ),
         );
@@ -105,6 +112,25 @@ class WebTaskCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                    const Gap(6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor().withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _getStatusLabel(),
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: _getStatusColor(),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -158,6 +184,64 @@ class WebTaskCard extends StatelessWidget {
         return TaskStatus.inProgress;
       case domain.TaskStatus.done:
         return TaskStatus.done;
+    }
+  }
+
+  String _getStatusLabel() {
+    // If task has a custom statusName, use it
+    if (task.statusName != null && task.statusName!.isNotEmpty) {
+      return task.statusName!;
+    }
+    
+    // Fall back to default status labels
+    switch (task.status) {
+      case domain.TaskStatus.todo:
+        return 'To Do';
+      case domain.TaskStatus.inProgress:
+        return 'In Progress';
+      case domain.TaskStatus.done:
+        return 'Done';
+    }
+  }
+
+  Color _getStatusColor() {
+    // If task has a custom statusName and project has custom statuses, find the matching color
+    if (task.statusName != null && 
+        task.statusName!.isNotEmpty && 
+        project?.customStatuses != null && 
+        project!.customStatuses!.isNotEmpty) {
+      try {
+        // Find matching status - handle both CustomStatus and CustomStatusModel
+        final statuses = project!.customStatuses!;
+        CustomStatus? matchingStatus;
+        
+        for (final status in statuses) {
+          if (status.name == task.statusName) {
+            matchingStatus = status;
+            break;
+          }
+        }
+        
+        // Use first status as fallback if no match found
+        matchingStatus ??= statuses.first;
+        
+        // Parse hex color
+        final hexColor = matchingStatus.colorHex.replaceAll('#', '');
+        return Color(int.parse('FF$hexColor', radix: 16));
+      } catch (e) {
+        // If there's any error, fall through to default colors
+        print('Error getting custom status color: $e');
+      }
+    }
+    
+    // Fall back to default status colors
+    switch (task.status) {
+      case domain.TaskStatus.todo:
+        return const Color(0xFFF59E0B); // Amber
+      case domain.TaskStatus.inProgress:
+        return const Color(0xFF8B5CF6); // Purple
+      case domain.TaskStatus.done:
+        return const Color(0xFF10B981); // Green
     }
   }
 }

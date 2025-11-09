@@ -14,6 +14,12 @@ class CreateProjectRequested extends ProjectEvent {
   final String creatorName;
   final List<Map<String, dynamic>> teamMembers;
   final List<Map<String, String>>? customStatuses;
+  
+  // Wizard Configuration Fields
+  final String? projectType;
+  final String? workflowType;
+  final String? projectKey;
+  final Map<String, bool>? additionalFeatures;
 
   const CreateProjectRequested({
     required this.name,
@@ -22,10 +28,25 @@ class CreateProjectRequested extends ProjectEvent {
     required this.creatorName,
     required this.teamMembers,
     this.customStatuses,
+    this.projectType,
+    this.workflowType,
+    this.projectKey,
+    this.additionalFeatures,
   });
 
   @override
-  List<Object?> get props => [name, description, creatorUid, creatorName, teamMembers, customStatuses];
+  List<Object?> get props => [
+        name,
+        description,
+        creatorUid,
+        creatorName,
+        teamMembers,
+        customStatuses,
+        projectType,
+        workflowType,
+        projectKey,
+        additionalFeatures,
+      ];
 }
 
 class GetProjectsRequested extends ProjectEvent {
@@ -88,5 +109,14 @@ class UpdateProjectRequested extends ProjectEvent {
 
   @override
   List<Object?> get props => [projectId, name, description, customStatuses];
+}
+
+class DeleteProjectRequested extends ProjectEvent {
+  final String projectId;
+
+  const DeleteProjectRequested({required this.projectId});
+
+  @override
+  List<Object?> get props => [projectId];
 }
 

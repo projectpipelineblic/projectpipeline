@@ -12,6 +12,10 @@ class ProjectModel extends ProjectEntity {
     required super.members,
     required super.pendingInvites,
     super.customStatuses,
+    super.projectType,
+    super.workflowType,
+    super.projectKey,
+    super.additionalFeatures,
   });
 
   factory ProjectModel.fromJson(Map<String, dynamic> json) {
@@ -58,6 +62,12 @@ class ProjectModel extends ProjectEntity {
               .toList() ??
           [],
       customStatuses: parsedStatuses,
+      projectType: json['projectType'] as String?,
+      workflowType: json['workflowType'] as String?,
+      projectKey: json['projectKey'] as String?,
+      additionalFeatures: json['additionalFeatures'] != null
+          ? Map<String, bool>.from(json['additionalFeatures'] as Map)
+          : null,
     );
   }
 
@@ -77,6 +87,10 @@ class ProjectModel extends ProjectEntity {
         'customStatuses': customStatuses!
             .map((s) => (s as CustomStatusModel).toJson())
             .toList(),
+      if (projectType != null) 'projectType': projectType,
+      if (workflowType != null) 'workflowType': workflowType,
+      if (projectKey != null) 'projectKey': projectKey,
+      if (additionalFeatures != null) 'additionalFeatures': additionalFeatures,
     };
   }
 }

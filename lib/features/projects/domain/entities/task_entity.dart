@@ -17,6 +17,14 @@ class TaskEntity extends Equatable {
   final String? statusName; // Custom status name (e.g., "Review", "Pre-review")
   final DateTime createdAt;
   final DateTime updatedAt;
+  final int timeSpentMinutes; // Total time spent on task in minutes
+  final DateTime? startedAt; // When the task was moved to in-progress
+  
+  // Sprint/Scrum fields
+  final String? sprintId; // ID of the sprint this task belongs to
+  final int? storyPoints; // Story points estimation (Fibonacci: 1, 2, 3, 5, 8, 13)
+  final double? estimatedHours; // Time estimation in hours
+  final String? sprintStatus; // Status within sprint: 'backlog', 'committed', 'completed'
 
   const TaskEntity({
     required this.id,
@@ -32,6 +40,12 @@ class TaskEntity extends Equatable {
     this.statusName,
     required this.createdAt,
     required this.updatedAt,
+    this.timeSpentMinutes = 0,
+    this.startedAt,
+    this.sprintId,
+    this.storyPoints,
+    this.estimatedHours,
+    this.sprintStatus = 'backlog',
   });
 
   @override
@@ -49,6 +63,12 @@ class TaskEntity extends Equatable {
         statusName,
         createdAt,
         updatedAt,
+        timeSpentMinutes,
+        startedAt,
+        sprintId,
+        storyPoints,
+        estimatedHours,
+        sprintStatus,
       ];
 }
 

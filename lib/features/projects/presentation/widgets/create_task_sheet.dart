@@ -18,16 +18,23 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameCtrl = TextEditingController();
   final TextEditingController _descCtrl = TextEditingController();
+  final TextEditingController _estimatedHoursCtrl = TextEditingController();
   TaskPriority _priority = TaskPriority.medium;
   String? _assigneeId;
   String? _assigneeName;
   DateTime? _dueDate;
   final List<TextEditingController> _subTaskCtrls = <TextEditingController>[];
+  
+  // Sprint/Scrum fields
+  String? _sprintId;
+  int? _storyPoints;
+  final List<int> _fibonacciPoints = [1, 2, 3, 5, 8, 13, 21];
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _descCtrl.dispose();
+    _estimatedHoursCtrl.dispose();
     for (final c in _subTaskCtrls) {
       c.dispose();
     }
@@ -36,6 +43,7 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final divider = Divider(color: Theme.of(context).dividerColor);
     final members = widget.project.members;
 
@@ -47,16 +55,21 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: PrimaryText(
-                  text: 'Create Task',
-                  size: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppPallete.secondary,
+              Expanded(
+                child: Text(
+                  'Create New Task',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
+                  ),
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.close),
+                icon: Icon(
+                  Icons.close,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                ),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
@@ -117,6 +130,89 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
               DropdownMenuItem(value: TaskPriority.high, child: Text('High')),
             ],
             onChanged: (v) => setState(() => _priority = v ?? TaskPriority.medium),
+          ),
+          const SizedBox(height: 16),
+          // Sprint/Scrum Section
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF6366F1).withOpacity(0.05),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: const Color(0xFF6366F1).withOpacity(0.2),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.rocket_launch,
+                      size: 18,
+                      color: const Color(0xFF6366F1),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Sprint / Scrum (Optional)',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        decoration: const InputDecoration(
+                          labelText: 'Story Points',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        value: _storyPoints,
+                        hint: const Text('None'),
+                        items: [
+                          const DropdownMenuItem<int>(value: null, child: Text('None')),
+                          ..._fibonacciPoints.map(
+                            (points) => DropdownMenuItem<int>(
+                              value: points,
+                              child: Text('$points'),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) => setState(() => _storyPoints = v),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _estimatedHoursCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Est. Hours',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          suffixText: 'hrs',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Story points help estimate task complexity. Sprints can be managed from the Task Board.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
@@ -217,6 +313,13 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
       defaultStatusName = widget.project.customStatuses!.first.name;
     }
     
+    // Parse estimated hours
+    double? estimatedHours;
+    final hoursText = _estimatedHoursCtrl.text.trim();
+    if (hoursText.isNotEmpty) {
+      estimatedHours = double.tryParse(hoursText);
+    }
+    
     final entity = TaskEntity(
       id: '',
       projectId: widget.project.id ?? '',
@@ -231,6 +334,11 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
       statusName: defaultStatusName,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+      // Sprint/Scrum fields
+      sprintId: _sprintId,
+      storyPoints: _storyPoints,
+      estimatedHours: estimatedHours,
+      sprintStatus: 'backlog',
     );
     widget.onSubmit(entity);
   }

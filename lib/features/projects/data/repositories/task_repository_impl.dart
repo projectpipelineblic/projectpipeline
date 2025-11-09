@@ -15,6 +15,11 @@ class TaskRepositoryImpl implements TaskRepository {
   }
 
   @override
+  Stream<List<TaskEntity>> streamUserTasks({required String userId}) {
+    return remote.streamUserTasks(userId: userId);
+  }
+
+  @override
   Future<Either<Failure, List<TaskEntity>>> getUserTasks({required String userId}) async {
     try {
       final tasks = await remote.getUserTasks(userId: userId);

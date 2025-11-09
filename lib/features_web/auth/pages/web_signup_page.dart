@@ -56,8 +56,12 @@ class _WebSignupPageState extends State<WebSignupPage> {
       backgroundColor: const Color(0xFFF5F7FA),
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
-          if (state is AuthSuccess) {
-            Navigator.pushReplacementNamed(context, '/web-home');
+          if (state is AuthSuccess || state is AuthAuthenticated || state is AuthOffline) {
+            print('✅ [WebSignup] Signup successful - navigating to home');
+            // Navigate to home page on successful signup
+            if (mounted) {
+              Navigator.of(context).pushReplacementNamed('/web-home');
+            }
           } else if (state is AuthError) {
             AppSnackBar.showError(context, state.message);
           }
@@ -86,13 +90,25 @@ class _WebSignupPageState extends State<WebSignupPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      SvgPicture.asset(
-                        'assets/app-logo.svg',
-                        height: 120,
+                      // Logo - Checkmark in violet container
+                      Container(
                         width: 120,
-                        colorFilter: const ColorFilter.mode(
-                          Colors.white,
-                          BlendMode.srcIn,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF8B5CF6),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 30,
+                              offset: const Offset(0, 15),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.check,
+                          color: Colors.white,
+                          size: 64,
                         ),
                       ),
                       const Gap(24),

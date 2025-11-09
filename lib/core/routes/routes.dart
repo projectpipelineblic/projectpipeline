@@ -7,7 +7,6 @@ import 'package:project_pipeline/features/profile/presentation/pages/settings_pa
 import 'package:project_pipeline/features/profile/presentation/pages/team_invites_page.dart';
 import 'package:project_pipeline/features_web/auth/pages/web_login_page.dart';
 import 'package:project_pipeline/features_web/auth/pages/web_signup_page.dart';
-import 'package:project_pipeline/features_web/auth/widgets/web_auth_wrapper.dart';
 import 'package:project_pipeline/features_web/home/pages/web_home_page.dart';
 
 class AppRoutes {
@@ -20,7 +19,6 @@ class AppRoutes {
   static const String teamInvites = '/team-invites';
   
   // Web Route names
-  static const String webAuthWrapper = '/web-auth-wrapper';
   static const String webLogin = '/web-login';
   static const String webSignup = '/web-signup';
   static const String webHome = '/web-home';
@@ -35,7 +33,6 @@ class AppRoutes {
     settings: (context) => const SettingsPage(),
     teamInvites: (context) => const TeamInvitesPage(),
     // Web routes
-    webAuthWrapper: (context) => const WebAuthWrapper(),
     webLogin: (context) => const WebLoginPage(),
     webSignup: (context) => const WebSignupPage(),
     webHome: (context) => const WebHomePage(),
@@ -75,11 +72,6 @@ class AppRoutes {
       case AppRoutes.teamInvites:
         return MaterialPageRoute(
           builder: (context) => const TeamInvitesPage(),
-          settings: settings,
-        );
-      case AppRoutes.webAuthWrapper:
-        return MaterialPageRoute(
-          builder: (context) => const WebAuthWrapper(),
           settings: settings,
         );
       case AppRoutes.webLogin:

@@ -5,6 +5,7 @@ import 'package:project_pipeline/features/projects/domain/entities/task_entity.d
 
 abstract class TaskRepository {
   Stream<List<TaskEntity>> streamTasks({required String projectId});
+  Stream<List<TaskEntity>> streamUserTasks({required String userId});
   Future<Either<Failure, List<TaskEntity>>> getUserTasks({required String userId});
   Future<Either<Failure, void>> createTask({required TaskEntity task});
   Future<Either<Failure, void>> updateTaskStatus({

@@ -62,6 +62,8 @@ class ProjectUpdated extends ProjectState {
   List<Object?> get props => [project];
 }
 
+class ProjectDeleted extends ProjectState {}
+
 class ProjectError extends ProjectState {
   final String message;
 

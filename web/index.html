@@ -30,12 +30,30 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Project Pipeline">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <!-- Build version for cache busting -->
+  <meta name="version" content="1.0.3">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
 
-  <!-- Favicon -->
+  <!-- Favicon - SVG for modern browsers, PNG fallback -->
+  <link rel="icon" type="image/svg+xml" href="app-logo.svg"/>
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>Project Pipeline - Task Management</title>
   <link rel="manifest" href="manifest.json">
+  
+  <!-- Prevent service worker caching -->
+  <script>
+    // Disable service worker caching for immediate updates
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+  </script>
 
   <style>
     body {

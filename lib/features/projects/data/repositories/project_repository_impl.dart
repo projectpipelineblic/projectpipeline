@@ -18,10 +18,17 @@ class ProjectRepositoryImpl implements ProjectRepository {
     required String creatorName,
     required List<Map<String, dynamic>> teamMembers,
     List<Map<String, String>>? customStatuses,
+    String? projectType,
+    String? workflowType,
+    String? projectKey,
+    Map<String, bool>? additionalFeatures,
   }) async {
     try {
       print('🔵 [ProjectRepository] Creating project: $name');
       print('🔍 [ProjectRepository] Custom statuses: $customStatuses');
+      print('🔍 [ProjectRepository] Project type: $projectType');
+      print('🔍 [ProjectRepository] Workflow type: $workflowType');
+      print('🔍 [ProjectRepository] Project key: $projectKey');
       
       final project = await _remoteDatasource.createProject(
         name: name,
@@ -30,6 +37,10 @@ class ProjectRepositoryImpl implements ProjectRepository {
         creatorName: creatorName,
         teamMembers: teamMembers,
         customStatuses: customStatuses,
+        projectType: projectType,
+        workflowType: workflowType,
+        projectKey: projectKey,
+        additionalFeatures: additionalFeatures,
       );
       
       print('✅ [ProjectRepository] Project created: ${project.id}');
@@ -154,6 +165,19 @@ class ProjectRepositoryImpl implements ProjectRepository {
       await _remoteDatasource.rejectInvite(inviteId);
       return const Right(null);
     } catch (e) {
+      return Left(Failure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteProject(String projectId) async {
+    try {
+      print('🔵 [ProjectRepository] Deleting project: $projectId');
+      await _remoteDatasource.deleteProject(projectId);
+      print('✅ [ProjectRepository] Project deleted successfully');
+      return const Right(null);
+    } catch (e) {
+      print('❌ [ProjectRepository] Error: $e');
       return Left(Failure(message: e.toString()));
     }
   }

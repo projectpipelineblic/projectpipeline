@@ -4,7 +4,7 @@
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FFFFFF",
-    "theme_color": "#3498db",
+    "theme_color": "#6366F1",
     "description": "Project and Task Management Application",
     "orientation": "any",
     "prefer_related_applications": false,

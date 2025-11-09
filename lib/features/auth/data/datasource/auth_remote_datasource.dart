@@ -1,4 +1,5 @@
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -17,9 +18,9 @@ abstract class AuthRemoteDatasource {
 class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    clientId: '288891668667-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com', // Add your web client ID here
-  );
+  // On web, GoogleSignIn automatically uses the web client ID from Firebase config
+  // On mobile, it uses the clientId from google-services.json/GoogleService-Info.plist
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   @override
   Future<UserEntity> signUpWithEmailAndPassword(UserEntity user) async {
@@ -92,37 +93,54 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
   Future<UserEntity> signInWithGoogle() async {
     try {
       print('🔵 [Google Sign-In] Starting Google Sign-In flow...');
+      print('🔵 [Google Sign-In] Platform: ${kIsWeb ? "Web" : "Mobile"}');
       
-      // Trigger Google Sign-In flow
+      UserCredential userCredential;
+      
+      if (kIsWeb) {
+        // Web: Use Firebase Auth popup directly (recommended for web)
+        print('🔵 [Google Sign-In Web] Using Firebase Auth popup...');
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        
+        // Set custom parameters if needed
+        googleProvider.setCustomParameters({
+          'prompt': 'select_account', // Force account selection
+        });
+        
+        // Sign in with popup
+        userCredential = await _auth.signInWithPopup(googleProvider);
+        print('✅ [Google Sign-In Web] Popup sign-in successful');
+      } else {
+        // Mobile: Use traditional GoogleSignIn package
+        print('🔵 [Google Sign-In Mobile] Using GoogleSignIn package...');
+        
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      print('🔵 [Google Sign-In] Sign-In dialog completed');
+        print('🔵 [Google Sign-In Mobile] Sign-In dialog completed');
 
       if (googleUser == null) {
         // User canceled the sign-in
-        print('⚠️ [Google Sign-In] User canceled the sign-in');
+          print('⚠️ [Google Sign-In Mobile] User canceled the sign-in');
         throw Exception('google-signin-canceled: User canceled the Google sign-in');
       }
 
-      print('🔵 [Google Sign-In] Google user obtained: ${googleUser.email}');
-      print('🔵 [Google Sign-In] Obtaining authentication details...');
+        print('🔵 [Google Sign-In Mobile] Google user obtained: ${googleUser.email}');
+        print('🔵 [Google Sign-In Mobile] Obtaining authentication details...');
 
       // Obtain auth details from request
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      print('🔵 [Google Sign-In] Authentication details obtained');
-      print('🔵 [Google Sign-In] Access Token present: ${googleAuth.accessToken != null}');
-      print('🔵 [Google Sign-In] ID Token present: ${googleAuth.idToken != null}');
+        print('🔵 [Google Sign-In Mobile] Authentication details obtained');
 
       // Create a new credential
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-      print('🔵 [Google Sign-In] Firebase credential created');
+        print('🔵 [Google Sign-In Mobile] Firebase credential created');
 
       // Sign in to Firebase with Google credential
-      print('🔵 [Google Sign-In] Signing in to Firebase...');
-      final UserCredential userCredential = await _auth.signInWithCredential(credential);
-      print('✅ [Google Sign-In] Firebase sign-in successful');
+        userCredential = await _auth.signInWithCredential(credential);
+        print('✅ [Google Sign-In Mobile] Firebase sign-in successful');
+      }
 
       final String uid = userCredential.user!.uid;
       final String email = userCredential.user!.email!;
@@ -138,9 +156,21 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
       final DocumentSnapshot userDoc = await _firestore.collection('Users').doc(uid).get();
 
       if (userDoc.exists) {
-        // User exists, return existing data
-        print('✅ [Google Sign-In] User exists in Firestore, returning existing data');
+        // User exists, check if username needs updating
+        print('✅ [Google Sign-In] User exists in Firestore');
         final userData = userDoc.data() as Map<String, dynamic>;
+        final existingUserName = userData['userName'] as String?;
+        
+        // If username is the same as email (incorrect), update it
+        if (existingUserName == email || existingUserName == null) {
+          print('🔧 [Google Sign-In] Updating username from "$existingUserName" to "$userName"');
+          await _firestore.collection('Users').doc(uid).update({
+            'userName': userName,
+          });
+          // Return updated user data
+          userData['userName'] = userName;
+        }
+        
         return UserModel.fromJson(userData);
       } else {
         // New user, create user document

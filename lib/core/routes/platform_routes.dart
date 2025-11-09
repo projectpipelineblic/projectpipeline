@@ -8,7 +8,6 @@ class PlatformRoutes {
   static bool get isWeb => kIsWeb;
 
   // Auth Routes
-  static String get authWrapper => isWeb ? AppRoutes.webAuthWrapper : AppRoutes.authWrapper;
   static String get login => isWeb ? AppRoutes.webLogin : AppRoutes.login;
   static String get signup => isWeb ? AppRoutes.webSignup : AppRoutes.signup;
   static String get home => isWeb ? AppRoutes.webHome : AppRoutes.home;

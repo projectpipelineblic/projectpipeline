@@ -137,12 +137,6 @@ class WebProfilePage extends StatelessWidget {
                       const Gap(16),
                       
                       _buildInfoRow(
-                        'User ID',
-                        user.uid ?? 'N/A',
-                        isDark,
-                      ),
-                      const Gap(12),
-                      _buildInfoRow(
                         'Email',
                         user.email,
                         isDark,
@@ -152,6 +146,108 @@ class WebProfilePage extends StatelessWidget {
                         'Username',
                         user.userName,
                         isDark,
+                      ),
+                      
+                      const Gap(32),
+                      Divider(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      ),
+                      const Gap(24),
+                      
+                      // Logout Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (dialogContext) => AlertDialog(
+                                backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                title: Row(
+                                  children: [
+                                    const Icon(Icons.logout, color: Colors.red, size: 28),
+                                    const Gap(12),
+                                    Text(
+                                      'Logout',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                content: Text(
+                                  'Are you sure you want to logout?',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 15,
+                                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(dialogContext),
+                                    child: Text(
+                                      'Cancel',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500,
+                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ),
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      print('🚪 [Logout] Sign out requested');
+                                      Navigator.pop(dialogContext);
+                                      context.read<AuthBloc>().add(SignOutRequested());
+                                      // Navigate to login page after logout
+                                      if (context.mounted) {
+                                        Navigator.of(context).pushNamedAndRemoveUntil(
+                                          '/web-login',
+                                          (route) => false,
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.logout, size: 18),
+                                    label: Text(
+                                      'Logout',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.logout, size: 20),
+                          label: Text(
+                            'Logout',
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
                       ),
                     ],
                   ),

@@ -6,6 +6,10 @@ import 'package:project_pipeline/features/projects/domain/entities/project_entit
 import 'package:project_pipeline/features/projects/presentation/bloc/project_bloc.dart';
 import 'package:project_pipeline/features/projects/presentation/bloc/project_event.dart';
 import 'package:project_pipeline/features/projects/presentation/bloc/project_state.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/send_team_invite_usecase.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/find_user_by_email_usecase.dart';
+import 'package:project_pipeline/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:project_pipeline/core/di/service_locator.dart';
 
 class EditProjectDialog extends StatefulWidget {
   final ProjectEntity project;
@@ -23,8 +27,10 @@ class _EditProjectDialogState extends State<EditProjectDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _descriptionController;
+  final _emailController = TextEditingController();
   
   late List<TaskStatusItem> _taskStatuses;
+  final List<String> _invitedEmails = [];
 
   @override
   void initState() {
@@ -63,7 +69,53 @@ class _EditProjectDialogState extends State<EditProjectDialog> {
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
+    _emailController.dispose();
     super.dispose();
+  }
+
+  void _addInvitedEmail() {
+    final email = _emailController.text.trim().toLowerCase();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter an email address'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    // Basic email validation
+    if (!email.contains('@') || !email.contains('.')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid email address'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    if (_invitedEmails.contains(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This email has already been invited'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    
+    setState(() {
+      _invitedEmails.add(email);
+      _emailController.clear();
+    });
+  }
+
+  void _removeInvitedEmail(String email) {
+    setState(() {
+      _invitedEmails.remove(email);
+    });
   }
 
   void _addCustomStatus() {
@@ -383,17 +435,108 @@ class _EditProjectDialogState extends State<EditProjectDialog> {
         );
         
         // Close dialog immediately
+        // Get auth state for sending invites
+        final authState = context.read<AuthBloc>().state;
+        String creatorUid = '';
+        String creatorName = '';
+        
+        if (authState is AuthSuccess) {
+          creatorUid = authState.user.uid ?? '';
+          creatorName = authState.user.userName ?? authState.user.email ?? '';
+        } else if (authState is AuthAuthenticated) {
+          creatorUid = authState.user.uid ?? '';
+          creatorName = authState.user.userName ?? authState.user.email ?? '';
+        }
+        
+        final invitedEmails = List<String>.from(_invitedEmails);
+        
         if (mounted) {
           Navigator.pop(context);
           print('✅ [EditProject] Dialog closed');
         }
         
         // Listen for update result
-        final subscription = projectBloc.stream.listen((state) {
+        final subscription = projectBloc.stream.listen((state) async {
           print('🔍 [EditProject] Project state changed: ${state.runtimeType}');
           
           if (state is ProjectUpdated) {
             print('✅ [EditProject] Project updated successfully');
+            
+            // Reload projects list to refresh the UI
+            if (creatorUid.isNotEmpty) {
+              print('🔄 [EditProject] Reloading projects list...');
+              projectBloc.add(GetProjectsRequested(userId: creatorUid));
+            }
+            
+            // Send invites if any
+            if (invitedEmails.isNotEmpty && widget.project.id != null) {
+              print('📧 [EditProject] Sending ${invitedEmails.length} invitations...');
+              int successCount = 0;
+              
+              for (final email in invitedEmails) {
+                print('🔍 [EditProject] Looking up user: $email');
+                
+                final findUserResult = await sl<FindUserByEmail>()(
+                  FindUserByEmailParams(email: email),
+                );
+                
+                await findUserResult.fold(
+                  (failure) {
+                    print('⚠️ [EditProject] User not found: $email');
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text('User $email not found. They must sign up first.'),
+                        backgroundColor: Colors.orange,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  (userInfo) async {
+                    print('✅ [EditProject] User found: $email');
+                    
+                    try {
+                      final inviteResult = await sl<SendTeamInvite>()(
+                        SendTeamInviteParams(
+                          projectId: widget.project.id!,
+                          projectName: projectName,
+                          invitedUserUid: userInfo.uid,
+                          invitedUserEmail: email,
+                          creatorName: creatorName,
+                          creatorUid: creatorUid,
+                          role: 'member',
+                          hasAccess: true,
+                        ),
+                      );
+                      
+                      inviteResult.fold(
+                        (failure) => print('❌ [EditProject] Failed to send invite'),
+                        (_) {
+                          successCount++;
+                          print('✅ [EditProject] Invite sent to $email');
+                        },
+                      );
+                    } catch (e) {
+                      print('❌ [EditProject] Exception: $e');
+                    }
+                  },
+                );
+              }
+              
+              final message = successCount > 0
+                  ? 'Project updated! Sent $successCount invite(s)'
+                  : 'Project updated';
+              
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text(message),
+                  backgroundColor: const Color(0xFF10B981),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              );
+            } else {
             messenger.showSnackBar(
               SnackBar(
                 content: Text('Project "${projectName}" updated successfully!'),
@@ -404,6 +547,7 @@ class _EditProjectDialogState extends State<EditProjectDialog> {
                 ),
               ),
             );
+            }
           } else if (state is ProjectError) {
             print('❌ [EditProject] Project update error: ${state.message}');
             messenger.showSnackBar(
@@ -615,6 +759,109 @@ class _EditProjectDialogState extends State<EditProjectDialog> {
                           },
                         ),
                       ),
+                      const Gap(32),
+                      
+                      // Team Members / Invite People Section
+                      Text(
+                        'Invite People',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : const Color(0xFF1E293B),
+                        ),
+                      ),
+                      const Gap(8),
+                      Text(
+                        'Invite team members to collaborate on this project',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                      ),
+                      const Gap(16),
+                      
+                      // Email Input
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _emailController,
+                              decoration: InputDecoration(
+                                labelText: 'Email Address',
+                                hintText: 'Enter email to invite',
+                                prefixIcon: const Icon(Icons.email_outlined),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                filled: true,
+                                fillColor: isDark 
+                                  ? const Color(0xFF334155) 
+                                  : const Color(0xFFF8FAFC),
+                              ),
+                              onFieldSubmitted: (_) => _addInvitedEmail(),
+                            ),
+                          ),
+                          const Gap(12),
+                          ElevatedButton.icon(
+                            onPressed: _addInvitedEmail,
+                            icon: const Icon(Icons.add, size: 20),
+                            label: const Text('Add'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF6366F1),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                      const Gap(16),
+                      
+                      // Invited Emails List
+                      if (_invitedEmails.isNotEmpty) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Invited (${_invitedEmails.length})',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                ),
+                              ),
+                              const Gap(12),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: _invitedEmails.map((email) {
+                                  return Chip(
+                                    label: Text(email),
+                                    deleteIcon: const Icon(Icons.close, size: 18),
+                                    onDeleted: () => _removeInvitedEmail(email),
+                                    backgroundColor: const Color(0xFF6366F1).withOpacity(0.1),
+                                    labelStyle: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      color: const Color(0xFF6366F1),
+                                    ),
+                                    deleteIconColor: const Color(0xFF6366F1),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
