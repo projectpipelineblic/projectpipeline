@@ -9,11 +9,15 @@ import 'package:project_pipeline/features/projects/presentation/bloc/project_eve
 import 'package:project_pipeline/features/projects/presentation/bloc/project_state.dart';
 import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
 import 'package:project_pipeline/features/projects/domain/entities/task_entity.dart' as domain;
+import 'package:project_pipeline/features/projects/domain/entities/sprint_entity.dart';
 import 'package:project_pipeline/features/projects/presentation/pages/task_detail_page.dart';
 import 'package:project_pipeline/features/projects/presentation/shared/task_types.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/stream_tasks_usecase.dart';
 import 'package:project_pipeline/features/projects/domain/usecases/create_task_usecase.dart';
-import 'package:project_pipeline/features/projects/presentation/widgets/create_task_sheet.dart';
+import 'package:project_pipeline/features_web/projects/widgets/web_create_task_dialog.dart';
+import 'package:project_pipeline/features_web/projects/widgets/sprint_management_dialog.dart';
+import 'package:project_pipeline/features_web/projects/widgets/sprint_gantt_timeline.dart';
+import 'package:project_pipeline/features_web/projects/widgets/sprint_details_dialog.dart';
 import 'package:project_pipeline/core/di/service_locator.dart';
 
 class WebTasksBoardPage extends StatefulWidget {
@@ -79,26 +83,32 @@ class _WebTasksBoardPageState extends State<WebTasksBoardPage> {
     String statusName,
     domain.TaskStatus status,
   ) async {
+    if (!mounted) return;
     if (_selectedProject?.id == null || task.id.isEmpty) return;
 
-    try {
-      await FirebaseFirestore.instance
-          .collection('Projects')
-          .doc(_selectedProject!.id)
-          .collection('tasks')
-          .doc(task.id)
-          .update({
-        'status': _statusToString(status),
-        'statusName': statusName,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update task: $e')),
-        );
+    // Wait for current frame to complete before updating
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      
+      try {
+        await FirebaseFirestore.instance
+            .collection('Projects')
+            .doc(_selectedProject!.id)
+            .collection('tasks')
+            .doc(task.id)
+            .update({
+          'status': _statusToString(status),
+          'statusName': statusName,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to update task: $e')),
+          );
+        }
       }
-    }
+    });
   }
 
   String _statusToString(domain.TaskStatus s) {
@@ -193,6 +203,8 @@ class _WebTasksBoardPageState extends State<WebTasksBoardPage> {
       statusName: task.statusName,
       timeSpentMinutes: task.timeSpentMinutes,
       startedAt: task.startedAt,
+      sprintId: task.sprintId,
+      sprintName: null, // Will be fetched separately if needed
     );
 
     await Navigator.push(
@@ -773,6 +785,7 @@ class _WebTasksBoardPageState extends State<WebTasksBoardPage> {
           Expanded(
             child: DragTarget<domain.TaskEntity>(
               onAcceptWithDetails: (details) {
+                if (!mounted) return;
                 final task = details.data;
                 if (task.statusName != status.name) {
                   final newStatusEnum = _mapCustomStatusToEnum(status.name, _selectedProject!.customStatuses ?? []);
@@ -1032,87 +1045,66 @@ class _WebTasksBoardPageState extends State<WebTasksBoardPage> {
   void _showCreateTaskDialog(CustomStatus status) {
     if (_selectedProject == null) return;
 
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? const Color(0xFF1E293B)
-                : Colors.white,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          padding: const EdgeInsets.all(24),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CreateTaskSheet(
-                  project: _selectedProject!,
-                  onSubmit: (taskEntity) async {
-                    Navigator.of(sheetContext).pop();
+      barrierDismissible: true,
+      builder: (dialogContext) => WebCreateTaskDialog(
+        project: _selectedProject!,
+        initialStatus: status.name,
+        onSubmit: (taskEntity) async {
+          Navigator.of(dialogContext).pop();
 
-                    // Map status to the correct enum and statusName
-                    final statusEnum = _mapCustomStatusToEnum(status.name, _selectedProject!.customStatuses ?? []);
+          // Map status to the correct enum and statusName
+          final statusEnum = _mapCustomStatusToEnum(status.name, _selectedProject!.customStatuses ?? []);
 
-                    // Create task with the selected status
-                    final taskWithStatus = domain.TaskEntity(
-                      id: taskEntity.id,
-                      projectId: taskEntity.projectId,
-                      title: taskEntity.title,
-                      description: taskEntity.description,
-                      assigneeId: taskEntity.assigneeId,
-                      assigneeName: taskEntity.assigneeName,
-                      priority: taskEntity.priority,
-                      subTasks: taskEntity.subTasks,
-                      dueDate: taskEntity.dueDate,
-                      status: statusEnum,
-                      statusName: status.name, // Set to the column's status
-                      createdAt: taskEntity.createdAt,
-                      updatedAt: taskEntity.updatedAt,
-                      timeSpentMinutes: 0,
-                      startedAt: null,
-                    );
+          // Create task with the selected status
+          final taskWithStatus = domain.TaskEntity(
+            id: taskEntity.id,
+            projectId: taskEntity.projectId,
+            title: taskEntity.title,
+            description: taskEntity.description,
+            assigneeId: taskEntity.assigneeId,
+            assigneeName: taskEntity.assigneeName,
+            priority: taskEntity.priority,
+            subTasks: taskEntity.subTasks,
+            dueDate: taskEntity.dueDate,
+            status: statusEnum,
+            statusName: status.name,
+            createdAt: taskEntity.createdAt,
+            updatedAt: taskEntity.updatedAt,
+            timeSpentMinutes: 0,
+            startedAt: null,
+            sprintId: taskEntity.sprintId,
+            storyPoints: taskEntity.storyPoints,
+            estimatedHours: taskEntity.estimatedHours,
+            sprintStatus: taskEntity.sprintStatus,
+          );
 
-                    final result = await sl<CreateTask>()(taskWithStatus);
+          final result = await sl<CreateTask>()(taskWithStatus);
 
-                    result.fold(
-                      (failure) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to create task: ${failure.message}'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      },
-                      (_) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('✅ Task created in "${status.name}"'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
-                      },
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
+          result.fold(
+            (failure) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to create task: ${failure.message}'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            (_) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('✅ Task created in "${status.name}"'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+          );
+        },
       ),
     );
   }
@@ -1245,95 +1237,17 @@ class _WebTasksBoardPageState extends State<WebTasksBoardPage> {
                 ],
               ),
             ),
-            // Timeline Controls
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                border: Border(
-                  bottom: BorderSide(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                  ),
-                ),
-              ),
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  SizedBox(
-                    width: constraints.maxWidth < 600 ? double.infinity : 250,
-                    child: TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Search timeline',
-                        prefixIcon: Icon(
-                          Icons.search,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(
-                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.filter_list, size: 18),
-                    label: const Text('Filters'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      side: BorderSide(
-                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Main Timeline Content
+            // Sprint Gantt Timeline
             Expanded(
-              child: StreamBuilder<List<domain.TaskEntity>>(
-                stream: _tasksStream,
-                builder: (context, snapshot) {
-                  // Show timeline immediately with available data
-                  final allTasks = snapshot.data ?? [];
-                  final userTasks = _currentUserId != null
-                      ? allTasks.where((t) => t.assigneeId == _currentUserId).toList()
-                      : allTasks;
-
-                  // Show error if there's an error
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: 48,
-                            color: Colors.red.withOpacity(0.7),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Error loading tasks',
-                            style: GoogleFonts.inter(fontSize: 14, color: Colors.red),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '${snapshot.error}',
-                            style: GoogleFonts.inter(fontSize: 12, color: Colors.red.withOpacity(0.7)),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  // Always show the timeline grid (even if loading or empty)
-                  return _buildTimelineGrid(userTasks, isDark, constraints.maxWidth);
+              child: SprintGanttTimeline(
+                project: _selectedProject!,
+                onSprintTap: (sprint) {
+                  // Show sprint details when tapped on sprint bar
+                  _showSprintDetailsDialog(context, sprint, isDark);
+                },
+                onAddSprintTap: () {
+                  // Open sprint management dialog to create new sprint
+                  _showSprintManagementDialog(context, isDark);
                 },
               ),
             ),
@@ -1764,125 +1678,48 @@ class _WebTasksBoardPageState extends State<WebTasksBoardPage> {
   }
 
   void _showSprintManagementDialog(BuildContext context, bool isDark) {
+    if (_selectedProject == null) return;
+
     showDialog(
       context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 500),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.rocket_launch,
-                      color: Color(0xFF6366F1),
-                      size: 24,
-                    ),
-                  ),
-                  const Gap(12),
-                  Expanded(
-                    child: Text(
-                      'Sprint Management',
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : const Color(0xFF1E293B),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  ),
-                ],
-              ),
-              const Gap(24),
-              // Coming soon message
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6366F1).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFF6366F1).withOpacity(0.3),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '🚀 Sprint Management Coming Soon!',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF6366F1),
-                      ),
-                    ),
-                    const Gap(8),
-                    Text(
-                      'Create and manage sprints, track velocity, and analyze your team\'s performance with powerful scrum tools.',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
-                    ),
-                    const Gap(16),
-                    Text(
-                      'Features:',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : const Color(0xFF1E293B),
-                      ),
-                    ),
-                    const Gap(8),
-                    ...[
-                      '• Create and start sprints',
-                      '• Assign tasks with story points',
-                      '• Track sprint progress and velocity',
-                      '• View burndown charts',
-                      '• Complete and archive sprints',
-                    ].map(
-                      (feature) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          feature,
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Gap(16),
-              Text(
-                'For now, you can assign tasks to sprints when creating them.',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-        ),
+      barrierDismissible: true,
+      builder: (dialogContext) => SprintManagementDialog(
+        project: _selectedProject!,
       ),
-    );
+    ).then((_) {
+      // When dialog closes, ensure we're still in good state
+      if (mounted) {
+        // Force rebuild
+        setState(() {});
+      }
+    });
+  }
+
+  void _showSprintDetailsDialog(BuildContext context, SprintEntity sprint, bool isDark) {
+    if (_selectedProject == null) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => SprintDetailsDialog(
+        project: _selectedProject!,
+        sprint: sprint,
+        onUpdated: () {
+          // Reload the timeline/tasks when tasks are assigned
+          // The stream will automatically update
+          if (mounted) {
+            setState(() {
+              // Force rebuild to refresh timeline
+            });
+          }
+        },
+      ),
+    ).then((_) {
+      // When dialog closes, ensure projects are still loaded
+      if (mounted) {
+        _loadProjects();
+      }
+    });
   }
 }
 

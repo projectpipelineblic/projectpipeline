@@ -30,6 +30,9 @@ class _WebProjectGridCardState extends State<WebProjectGridCard> {
   int _totalTasks = 0;
   int _completedTasks = 0;
   int _memberCount = 0;
+  int _totalSprints = 0;
+  int _activeSprints = 0;
+  int _completedSprints = 0;
   bool _loading = true;
 
   @override
@@ -42,22 +45,48 @@ class _WebProjectGridCardState extends State<WebProjectGridCard> {
     if (widget.project.id == null) return;
 
     try {
-      // Fetch tasks
-      final tasksSnapshot = await FirebaseFirestore.instance
-          .collection('Projects')
-          .doc(widget.project.id)
-          .collection('tasks')
-          .get();
+      // Fetch tasks and sprints in parallel
+      final results = await Future.wait([
+        FirebaseFirestore.instance
+            .collection('Projects')
+            .doc(widget.project.id)
+            .collection('tasks')
+            .get(),
+        FirebaseFirestore.instance
+            .collection('Projects')
+            .doc(widget.project.id)
+            .collection('sprints')
+            .get(),
+      ]);
+
+      final tasksSnapshot = results[0];
+      final sprintsSnapshot = results[1];
 
       final completed = tasksSnapshot.docs
           .where((doc) => doc.data()['status'] == 'done')
           .length;
+
+      // Count sprints by status
+      int active = 0;
+      int completedSpr = 0;
+      
+      for (var doc in sprintsSnapshot.docs) {
+        final status = doc.data()['status'] as String?;
+        if (status == 'active') {
+          active++;
+        } else if (status == 'completed') {
+          completedSpr++;
+        }
+      }
 
       if (mounted) {
         setState(() {
           _totalTasks = tasksSnapshot.docs.length;
           _completedTasks = completed;
           _memberCount = widget.project.members.length;
+          _totalSprints = sprintsSnapshot.docs.length;
+          _activeSprints = active;
+          _completedSprints = completedSpr;
           _loading = false;
         });
       }
@@ -413,50 +442,195 @@ class _WebProjectGridCardState extends State<WebProjectGridCard> {
                 
                 const Spacer(),
                 
-                // Progress Bar (Jira Style)
-                if (!_loading && _totalTasks > 0) ...[
+                // Progress Bar (Jira Style) - Tasks or Sprints
+                if (!_loading) ...[
                   const Gap(12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Progress',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  
+                  // Show task progress if tasks exist
+                  if (_totalTasks > 0) ...[
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Task Progress',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
+                            ),
+                            Text(
+                              '$_completedTasks of $_totalTasks completed',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Gap(6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 6,
+                            backgroundColor: isDark 
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE2E8F0),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              progress >= 1.0 
+                                ? const Color(0xFF10B981) 
+                                : const Color(0xFF6366F1),
                             ),
                           ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  
+                  // Show sprint info if sprints exist
+                  if (_totalSprints > 0) ...[
+                    if (_totalTasks > 0) const Gap(12),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isDark 
+                          ? const Color(0xFF334155).withOpacity(0.5)
+                          : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isDark 
+                            ? const Color(0xFF475569)
+                            : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          // Sprint icon
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF8B5CF6).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(
+                              Icons.rocket_launch,
+                              size: 16,
+                              color: Color(0xFF8B5CF6),
+                            ),
+                          ),
+                          const Gap(10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Sprints',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark 
+                                      ? const Color(0xFF94A3B8) 
+                                      : const Color(0xFF64748B),
+                                  ),
+                                ),
+                                const Gap(2),
+                                Row(
+                                  children: [
+                                    // Active sprints
+                                    if (_activeSprints > 0) ...[
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFEC4899).withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: 5,
+                                              height: 5,
+                                              decoration: const BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: Color(0xFFEC4899),
+                                              ),
+                                            ),
+                                            const Gap(4),
+                                            Text(
+                                              '$_activeSprints Active',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w600,
+                                                color: const Color(0xFFEC4899),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const Gap(4),
+                                    ],
+                                    // Completed sprints
+                                    if (_completedSprints > 0) ...[
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF10B981).withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: 5,
+                                              height: 5,
+                                              decoration: const BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: Color(0xFF10B981),
+                                              ),
+                                            ),
+                                            const Gap(4),
+                                            Text(
+                                              '$_completedSprints Done',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w600,
+                                                color: const Color(0xFF10B981),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Total sprint count
                           Text(
-                            '$_completedTasks of $_totalTasks completed',
+                            '$_totalSprints',
                             style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDark 
+                                ? Colors.white 
+                                : const Color(0xFF1E293B),
                             ),
                           ),
                         ],
                       ),
-                      const Gap(6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 6,
-                          backgroundColor: isDark 
-                            ? const Color(0xFF334155)
-                            : const Color(0xFFE2E8F0),
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            progress >= 1.0 
-                              ? const Color(0xFF10B981) 
-                              : const Color(0xFF6366F1),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ],
                 
                 const Gap(12),

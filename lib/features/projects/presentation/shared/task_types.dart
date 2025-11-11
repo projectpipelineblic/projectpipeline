@@ -15,6 +15,8 @@ class TaskItem {
     this.statusName,
     this.timeSpentMinutes = 0,
     this.startedAt,
+    this.sprintId,
+    this.sprintName,
   });
 
   final String id;
@@ -29,6 +31,8 @@ class TaskItem {
   final String? statusName; // Custom status name (e.g., "Review", "Pre-review")
   final int timeSpentMinutes; // Total time spent on task in minutes
   final DateTime? startedAt; // When the task was moved to in-progress
+  final String? sprintId; // Sprint ID if task is assigned to a sprint
+  final String? sprintName; // Sprint name for display
 
   String get dueDateLabel {
     if (dueDate == null) return '';

@@ -27,7 +27,11 @@ class _WebProjectsPageState extends State<WebProjectsPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Reload projects when page is revisited
-    _loadProjects();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadProjects();
+      }
+    });
   }
 
   void _loadProjects() {

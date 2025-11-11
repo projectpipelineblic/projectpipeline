@@ -12,8 +12,10 @@ import 'package:project_pipeline/features/projects/presentation/shared/task_type
 import 'package:project_pipeline/features/projects/presentation/widgets/task_filters.dart' as filters;
 import 'package:project_pipeline/features_web/projects/widgets/edit_project_dialog.dart';
 import 'package:project_pipeline/features_web/projects/widgets/project_logs_dialog.dart';
+import 'package:project_pipeline/features_web/projects/widgets/web_create_task_dialog.dart';
 import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 
 class ProjectDetailPage extends StatefulWidget {
   const ProjectDetailPage({super.key, required this.project});
@@ -36,6 +38,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   bool _showMembers = false;
   String? _currentUserUid;
   late ProjectEntity _project;
+  int _selectedTabIndex = 0; // 0 = Analytics, 1 = Tasks
 
   @override
   void initState() {
@@ -169,10 +172,43 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         .collection('tasks')
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .listen((snapshot) {
-      final list = snapshot.docs.map((d) {
+        .listen((snapshot) async {
+      // Create a map to cache sprint names
+      final Map<String, String> sprintNameCache = {};
+      
+      final list = <TaskItem>[];
+      
+      for (var d in snapshot.docs) {
         final data = d.data();
-        return TaskItem(
+        final sprintId = data['sprintId'] as String?;
+        String? sprintName;
+        
+        // Fetch sprint name if sprintId exists and not in cache
+        if (sprintId != null && sprintId.isNotEmpty) {
+          if (sprintNameCache.containsKey(sprintId)) {
+            sprintName = sprintNameCache[sprintId];
+          } else {
+            try {
+              final sprintDoc = await FirebaseFirestore.instance
+                  .collection('Projects')
+                  .doc(projectId)
+                  .collection('sprints')
+                  .doc(sprintId)
+                  .get();
+              
+              if (sprintDoc.exists) {
+                sprintName = sprintDoc.data()?['name'] as String?;
+                if (sprintName != null) {
+                  sprintNameCache[sprintId] = sprintName;
+                }
+              }
+            } catch (e) {
+              print('Error fetching sprint name: $e');
+            }
+          }
+        }
+        
+        list.add(TaskItem(
           id: data['id'] as String? ?? d.id,
           title: data['title'] as String? ?? '',
           description: data['description'] as String? ?? '',
@@ -185,11 +221,16 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           statusName: data['statusName'] as String?,
           timeSpentMinutes: data['timeSpentMinutes'] as int? ?? 0,
           startedAt: (data['startedAt'] as Timestamp?)?.toDate(),
-        );
-      }).toList();
-      setState(() => _tasks
-        ..clear()
-        ..addAll(list));
+          sprintId: sprintId,
+          sprintName: sprintName,
+        ));
+      }
+      
+      if (mounted) {
+        setState(() => _tasks
+          ..clear()
+          ..addAll(list));
+      }
     });
   }
 
@@ -212,17 +253,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         return TaskStatus.done;
       default:
         return TaskStatus.todo;
-    }
-  }
-
-  String _statusToString(TaskStatus s) {
-    switch (s) {
-      case TaskStatus.todo:
-        return 'todo';
-      case TaskStatus.inProgress:
-        return 'inProgress';
-      case TaskStatus.done:
-        return 'done';
     }
   }
 
@@ -269,89 +299,157 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           const SizedBox(width: 4),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _ProjectHeader(
-              project: _project,
-              onMembersTap: () => setState(() => _showMembers = !_showMembers),
-              isWeb: isWeb,
-              isDark: isDark,
-            ),
-            if (_showMembers) ...[
-              const SizedBox(height: 12),
-              _MembersList(
-                project: _project,
-                currentUserUid: _currentUserUid,
-                onToggleRole: _updateMemberRole,
-              ),
-              const SizedBox(height: 16),
-            ],
-            const SizedBox(height: 16),
-            
-            // Analytics Section (Web Only)
-            if (isWeb) ...[
-              _ProjectAnalytics(
-                projectId: _project.id ?? '',
-                project: _project,
-                tasks: _tasks,
-                members: _project.members,
-                isDark: isDark,
-              ),
-              const SizedBox(height: 24),
-            ],
-            
-            Row(
+      body: Column(
+        children: [
+          // Project Header (always visible)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
               children: [
-                IconButton(
-                  tooltip: 'Filter',
-                  onPressed: _openFilterSheet,
-                  icon: const Icon(Icons.filter_list),
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? const Color(0xFFE5E7EB)
-                      : AppPallete.secondary,
+                _ProjectHeader(
+                  project: _project,
+                  onMembersTap: () => setState(() => _showMembers = !_showMembers),
+                  isWeb: isWeb,
+                  isDark: isDark,
                 ),
-                const SizedBox(width: 4),
-                const _SectionTitle(title: 'Tasks'),
+                if (_showMembers) ...[
+                  const SizedBox(height: 12),
+                  _MembersList(
+                    project: _project,
+                    currentUserUid: _currentUserUid,
+                    onToggleRole: _updateMemberRole,
+                  ),
+                ],
               ],
             ),
-            const SizedBox(height: 12),
-            Builder(
-              builder: (context) {
-                print('🔍 [ProjectDetail] Rendering filters for project: ${_project.name}');
-                print('🔍 [ProjectDetail] Custom statuses count: ${_project.customStatuses?.length ?? 0}');
-                if (_project.customStatuses != null) {
-                  for (var status in _project.customStatuses!) {
-                    print('  - ${status.name} (${status.colorHex})');
-                  }
-                }
-                
-                return filters.TaskFilters(
-                  selected: _selectedFilter,
-                  onChanged: (f) => setState(() => _selectedFilter = f),
-                  customStatuses: _project.customStatuses,
-                  selectedStatusName: _selectedCustomStatusName,
-                  onStatusNameChanged: (name) {
-                    setState(() {
-                      _selectedCustomStatusName = name;
-                    });
-                  },
-                );
-              },
+          ),
+          
+          // Tabs (Web Only)
+          if (isWeb) ...[
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _TabButton(
+                      label: 'Analytics',
+                      icon: Icons.analytics_outlined,
+                      isSelected: _selectedTabIndex == 0,
+                      onTap: () => setState(() => _selectedTabIndex = 0),
+                      isDark: isDark,
+                    ),
+                  ),
+                  Expanded(
+                    child: _TabButton(
+                      label: 'Tasks',
+                      icon: Icons.task_alt_outlined,
+                      isSelected: _selectedTabIndex == 1,
+                      onTap: () => setState(() => _selectedTabIndex = 1),
+                      isDark: isDark,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-            _TaskList(
-              tasks: _filteredTasks(),
-              projectId: _project.id,
-              project: _project,
-              isWeb: isWeb,
-              isDark: isDark,
+            const SizedBox(height: 16),
+          ],
+          
+          // Tab Content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: _selectedTabIndex == 0 && isWeb
+                  ? _buildAnalyticsTab(isDark)
+                  : _buildTasksTab(context, isDark, isWeb),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsTab(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Sprint Analytics Section
+        _SprintAnalytics(
+          projectId: _project.id ?? '',
+          project: _project,
+          isDark: isDark,
+        ),
+        const SizedBox(height: 24),
+        
+        // Project Analytics Section
+        _ProjectAnalytics(
+          projectId: _project.id ?? '',
+          project: _project,
+          tasks: _tasks,
+          members: _project.members,
+          isDark: isDark,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTasksTab(BuildContext context, bool isDark, bool isWeb) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            IconButton(
+              tooltip: 'Filter',
+              onPressed: _openFilterSheet,
+              icon: const Icon(Icons.filter_list),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFFE5E7EB)
+                  : AppPallete.secondary,
+            ),
+            const SizedBox(width: 4),
+            const _SectionTitle(title: 'Tasks'),
           ],
         ),
-      ),
+        const SizedBox(height: 12),
+        Builder(
+          builder: (context) {
+            print('🔍 [ProjectDetail] Rendering filters for project: ${_project.name}');
+            print('🔍 [ProjectDetail] Custom statuses count: ${_project.customStatuses?.length ?? 0}');
+            if (_project.customStatuses != null) {
+              for (var status in _project.customStatuses!) {
+                print('  - ${status.name} (${status.colorHex})');
+              }
+            }
+            
+            return filters.TaskFilters(
+              selected: _selectedFilter,
+              onChanged: (f) => setState(() => _selectedFilter = f),
+              customStatuses: _project.customStatuses,
+              selectedStatusName: _selectedCustomStatusName,
+              onStatusNameChanged: (name) {
+                setState(() {
+                  _selectedCustomStatusName = name;
+                });
+              },
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        _TaskList(
+          tasks: _filteredTasks(),
+          projectId: _project.id,
+          project: _project,
+          isWeb: isWeb,
+          isDark: isDark,
+        ),
+      ],
     );
   }
 
@@ -398,78 +496,33 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   void _openCreateTaskSheet() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).dialogBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(16),
-          topRight: Radius.circular(16),
-        ),
+      barrierDismissible: true,
+      builder: (context) => WebCreateTaskDialog(
+        project: _project,
+        onSubmit: (task) {
+          // Task is already created in Firestore by the dialog
+          // Just close the dialog and refresh
+          Navigator.of(context).pop();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ Task created successfully'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        },
       ),
-      builder: (context) {
-        final insets = MediaQuery.of(context).viewInsets;
-        return SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 16,
-              bottom: 16 + insets.bottom,
-            ),
-              child: _CreateTaskForm(
-              project: _project,
-              onSubmit: (task) async {
-                await _createTaskInFirestore(task);
-                if (!mounted) return;
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Task created')),
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _createTaskInFirestore(TaskItem task) async {
-    final projectId = _project.id;
-    if (projectId == null) return;
-    final col = FirebaseFirestore.instance
-        .collection('Projects')
-        .doc(projectId)
-        .collection('tasks');
-    final doc = col.doc();
-    await doc.set({
-      'id': doc.id,
-      'title': task.title,
-      'description': task.description,
-      'assigneeId': task.assigneeId,
-      'assigneeName': task.assigneeName,
-      'priority': _priorityToString(task.priority),
-      'subTasks': task.subTasks,
-      'dueDate': task.dueDate == null ? null : Timestamp.fromDate(task.dueDate!),
-      'status': _statusToString(task.status),
-      'statusName': task.statusName, // Save custom status name
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
+    ).then((_) {
+      // Refresh tasks after dialog closes
+      if (mounted) {
+        _subscribeTasks();
+      }
     });
   }
 
-  String _priorityToString(TaskPriority p) {
-    switch (p) {
-      case TaskPriority.low:
-        return 'low';
-      case TaskPriority.medium:
-        return 'medium';
-      case TaskPriority.high:
-        return 'high';
-    }
-  }
 
   Future<void> _updateMemberRole({
     required String memberUid,
@@ -908,6 +961,62 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 }
 
+class _TabButton extends StatelessWidget {
+  const _TabButton({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+    required this.isDark,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF6366F1)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ProjectHeader extends StatelessWidget {
   const _ProjectHeader({
     required this.project,
@@ -1294,37 +1403,75 @@ class _TaskList extends StatelessWidget {
                         ),
                       ),
                     const SizedBox(height: 6),
-                    // Status chip
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _statusColor(t).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: _statusColor(t).withOpacity(0.3),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: _statusColor(t),
-                              shape: BoxShape.circle,
+                    // Status and Sprint chips row
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        // Status chip
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _statusColor(t).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: _statusColor(t).withOpacity(0.3),
+                              width: 1,
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          PrimaryText(
-                            text: t.statusName ?? _statusLabel(t.status),
-                            size: 10,
-                            fontWeight: FontWeight.w600,
-                            color: _statusColor(t),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: _statusColor(t),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              PrimaryText(
+                                text: t.statusName ?? _statusLabel(t.status),
+                                size: 10,
+                                fontWeight: FontWeight.w600,
+                                color: _statusColor(t),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        
+                        // Sprint chip (if assigned)
+                        if (t.sprintName != null && t.sprintName!.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFF8B5CF6).withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.rocket_launch,
+                                  size: 10,
+                                  color: Color(0xFF8B5CF6),
+                                ),
+                                const SizedBox(width: 4),
+                                PrimaryText(
+                                  text: t.sprintName!,
+                                  size: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF8B5CF6),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -1388,231 +1535,474 @@ class _TaskList extends StatelessWidget {
 // TaskItem and enums are now in shared/task_types.dart
 
 
-class _CreateTaskForm extends StatefulWidget {
-  const _CreateTaskForm({required this.project, required this.onSubmit});
-
+// Sprint Analytics Widget for Project Detail Page
+class _SprintAnalytics extends StatefulWidget {
+  final String projectId;
   final ProjectEntity project;
-  final ValueChanged<TaskItem> onSubmit;
+  final bool isDark;
+
+  const _SprintAnalytics({
+    required this.projectId,
+    required this.project,
+    required this.isDark,
+  });
 
   @override
-  State<_CreateTaskForm> createState() => _CreateTaskFormState();
+  State<_SprintAnalytics> createState() => _SprintAnalyticsState();
 }
 
-class _CreateTaskFormState extends State<_CreateTaskForm> {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameCtrl = TextEditingController();
-  final TextEditingController _descCtrl = TextEditingController();
-  TaskPriority _priority = TaskPriority.medium;
-  String? _assigneeId;
-  String? _assigneeName;
-  DateTime? _dueDate;
-  final List<TextEditingController> _subTaskCtrls = <TextEditingController>[];
+class _SprintAnalyticsState extends State<_SprintAnalytics> {
+  List<Map<String, dynamic>> _sprints = [];
+  bool _loading = true;
+  int _totalSprints = 0;
+  int _activeSprints = 0;
+  int _completedSprints = 0;
+  int _planningSprints = 0;
 
   @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _descCtrl.dispose();
-    for (final c in _subTaskCtrls) {
-      c.dispose();
+  void initState() {
+    super.initState();
+    _loadSprints();
+  }
+
+  Future<void> _loadSprints() async {
+    if (widget.projectId.isEmpty) return;
+
+    try {
+      final sprintsSnapshot = await FirebaseFirestore.instance
+          .collection('Projects')
+          .doc(widget.projectId)
+          .collection('sprints')
+          .orderBy('startDate', descending: false)
+          .get();
+
+      final sprints = <Map<String, dynamic>>[];
+      int active = 0;
+      int completed = 0;
+      int planning = 0;
+
+      for (var doc in sprintsSnapshot.docs) {
+        final data = doc.data();
+        sprints.add(data);
+        
+        final status = data['status'] as String?;
+        if (status == 'active') {
+          active++;
+        } else if (status == 'completed') {
+          completed++;
+        } else if (status == 'planning') {
+          planning++;
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _sprints = sprints;
+          _totalSprints = sprints.length;
+          _activeSprints = active;
+          _completedSprints = completed;
+          _planningSprints = planning;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading sprints: $e');
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
-    super.dispose();
+  }
+
+  Color _getStatusColor(String? status) {
+    switch (status) {
+      case 'active':
+        return const Color(0xFFEC4899); // Pink
+      case 'completed':
+        return const Color(0xFF10B981); // Green
+      case 'planning':
+        return const Color(0xFF3B82F6); // Blue
+      case 'cancelled':
+        return const Color(0xFF64748B); // Gray
+      default:
+        return const Color(0xFF6366F1); // Indigo
+    }
+  }
+
+  String _getStatusLabel(String? status) {
+    switch (status) {
+      case 'active':
+        return 'Active';
+      case 'completed':
+        return 'Completed';
+      case 'planning':
+        return 'Planning';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  IconData _getStatusIcon(String? status) {
+    switch (status) {
+      case 'active':
+        return Icons.play_circle;
+      case 'completed':
+        return Icons.check_circle;
+      case 'planning':
+        return Icons.schedule;
+      case 'cancelled':
+        return Icons.cancel;
+      default:
+        return Icons.circle;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final divider = Divider(color: Theme.of(context).dividerColor);
-    final members = widget.project.members;
+    if (_loading) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: widget.isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(color: Color(0xFF6366F1)),
+        ),
+      );
+    }
 
-    return Form(
-      key: _formKey,
+    if (_totalSprints == 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: widget.isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: widget.isDark
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(
-                child: PrimaryText(
-                  text: 'Create Task',
-                  size: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? const Color(0xFFE5E7EB)
-                      : AppPallete.secondary,
+              const Icon(
+                Icons.rocket_launch,
+                color: Color(0xFF8B5CF6),
+                size: 24,
+              ),
+              const Gap(12),
+              Text(
+                'Sprint Analytics',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: widget.isDark ? Colors.white : const Color(0xFF1E293B),
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(context).pop(),
+            ],
+          ),
+          const Gap(24),
+
+          // Stats Row
+          Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: [
+              SizedBox(
+                width: (MediaQuery.of(context).size.width - 120) / 4,
+                child: _SprintStatCard(
+                  label: 'Total Sprints',
+                  value: _totalSprints.toString(),
+                  icon: Icons.rocket_launch,
+                  color: const Color(0xFF8B5CF6),
+                  isDark: widget.isDark,
+                ),
+              ),
+              SizedBox(
+                width: (MediaQuery.of(context).size.width - 120) / 4,
+                child: _SprintStatCard(
+                  label: 'Active',
+                  value: _activeSprints.toString(),
+                  icon: Icons.play_circle,
+                  color: const Color(0xFFEC4899),
+                  isDark: widget.isDark,
+                ),
+              ),
+              SizedBox(
+                width: (MediaQuery.of(context).size.width - 120) / 4,
+                child: _SprintStatCard(
+                  label: 'Completed',
+                  value: _completedSprints.toString(),
+                  icon: Icons.check_circle,
+                  color: const Color(0xFF10B981),
+                  isDark: widget.isDark,
+                ),
+              ),
+              SizedBox(
+                width: (MediaQuery.of(context).size.width - 120) / 4,
+                child: _SprintStatCard(
+                  label: 'Planning',
+                  value: _planningSprints.toString(),
+                  icon: Icons.schedule,
+                  color: const Color(0xFF3B82F6),
+                  isDark: widget.isDark,
+                ),
               ),
             ],
           ),
-          divider,
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _nameCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Task name',
-              border: OutlineInputBorder(),
-            ),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _descCtrl,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Task description',
-              border: OutlineInputBorder(),
+          const Gap(24),
+
+          // Sprint List
+          Text(
+            'Sprint Timeline',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: widget.isDark ? Colors.white : const Color(0xFF1E293B),
             ),
           ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            decoration: const InputDecoration(
-              labelText: 'Assignee',
-              border: OutlineInputBorder(),
-            ),
-            value: _assigneeId,
-            items: [
-              for (final m in members)
-                DropdownMenuItem<String>(
-                  value: m.uid,
-                  child: Text(m.name.isNotEmpty ? m.name : m.email),
-                  onTap: () {
-                    _assigneeName = m.name.isNotEmpty ? m.name : m.email;
-                  },
+          const Gap(12),
+
+          // Display sprints in a timeline format
+          ..._sprints.map((sprint) {
+            final status = sprint['status'] as String?;
+            final statusColor = _getStatusColor(status);
+            final name = sprint['name'] as String? ?? 'Unnamed Sprint';
+            final startDate = (sprint['startDate'] as Timestamp?)?.toDate();
+            final endDate = (sprint['endDate'] as Timestamp?)?.toDate();
+            final totalStoryPoints = sprint['totalStoryPoints'] as int? ?? 0;
+            final completedStoryPoints = sprint['completedStoryPoints'] as int? ?? 0;
+            final progress = totalStoryPoints > 0 
+                ? (completedStoryPoints / totalStoryPoints) 
+                : 0.0;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: widget.isDark
+                    ? const Color(0xFF0F172A)
+                    : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: statusColor.withOpacity(0.3),
+                  width: 2,
                 ),
-            ],
-            onChanged: (v) {
-              setState(() {
-                _assigneeId = v;
-              });
-            },
-            validator: (v) => (v == null || v.isEmpty) ? 'Select assignee' : null,
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<TaskPriority>(
-            decoration: const InputDecoration(
-              labelText: 'Priority',
-              border: OutlineInputBorder(),
-            ),
-            value: _priority,
-            items: const [
-              DropdownMenuItem(value: TaskPriority.low, child: Text('Low')),
-              DropdownMenuItem(value: TaskPriority.medium, child: Text('Medium')),
-              DropdownMenuItem(value: TaskPriority.high, child: Text('High')),
-            ],
-            onChanged: (v) => setState(() => _priority = v ?? TaskPriority.medium),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _pickDueDate,
-            icon: const Icon(Icons.event),
-            label: PrimaryText(
-              text: _dueDate == null
-                  ? 'Due date: Pick due date'
-                  : 'Due date: ${_dueDate!.day.toString().padLeft(2, '0')}/${_dueDate!.month.toString().padLeft(2, '0')}/${_dueDate!.year}',
-              size: 14,
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFFE5E7EB)
-                  : AppPallete.secondary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          PrimaryText(
-            text: 'Sub tasks',
-            size: 14,
-            fontWeight: FontWeight.w700,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? const Color(0xFFE5E7EB)
-                : AppPallete.secondary,
-          ),
-          const SizedBox(height: 8),
-          for (int i = 0; i < _subTaskCtrls.length; i++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _subTaskCtrls[i],
-                      decoration: InputDecoration(
-                        labelText: 'Sub task ${i + 1}',
-                        border: const OutlineInputBorder(),
+                  Row(
+                    children: [
+                      // Status indicator
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          _getStatusIcon(status),
+                          color: statusColor,
+                          size: 20,
+                        ),
                       ),
+                      const Gap(12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: GoogleFonts.inter(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: widget.isDark
+                                    ? Colors.white
+                                    : const Color(0xFF1E293B),
+                              ),
+                            ),
+                            const Gap(4),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.calendar_today,
+                                  size: 12,
+                                  color: widget.isDark
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF64748B),
+                                ),
+                                const Gap(4),
+                                Text(
+                                  startDate != null && endDate != null
+                                      ? '${DateFormat('MMM d').format(startDate)} - ${DateFormat('MMM d, y').format(endDate)}'
+                                      : 'No dates set',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: widget.isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Status badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: statusColor.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Text(
+                          _getStatusLabel(status),
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: statusColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Story points progress
+                  if (totalStoryPoints > 0) ...[
+                    const Gap(12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Story Points',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: widget.isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B),
+                              ),
+                            ),
+                            Text(
+                              '$completedStoryPoints / $totalStoryPoints',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: widget.isDark
+                                    ? Colors.white
+                                    : const Color(0xFF1E293B),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Gap(6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 6,
+                            backgroundColor: widget.isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFE2E8F0),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              progress >= 1.0
+                                  ? const Color(0xFF10B981)
+                                  : statusColor,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: () {
-                      setState(() {
-                        _subTaskCtrls.removeAt(i).dispose();
-                      });
-                    },
-                    icon: const Icon(Icons.close),
-                  ),
+                  ],
                 ],
               ),
-            ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _subTaskCtrls.add(TextEditingController());
-                });
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Add sub task'),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+}
+
+class _SprintStatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final bool isDark;
+
+  const _SprintStatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 28),
+          const Gap(8),
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF1E293B),
             ),
           ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppPallete.primary),
-              onPressed: _submit,
-              child: const PrimaryText(
-                text: 'Create Task',
-                color: AppPallete.white,
-                fontWeight: FontWeight.w600,
-              ),
+          const Gap(4),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
-
-  Future<void> _pickDueDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _dueDate ?? now,
-      firstDate: DateTime(now.year, now.month, now.day),
-      lastDate: DateTime(now.year + 5),
-    );
-    if (picked != null) {
-      setState(() => _dueDate = picked);
-    }
-  }
-
-  void _submit() {
-    if (!_formKey.currentState!.validate()) return;
-    final subTasks = _subTaskCtrls.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
-    final task = TaskItem(
-      title: _nameCtrl.text.trim(),
-      description: _descCtrl.text.trim(),
-      assigneeId: _assigneeId!,
-      assigneeName: _assigneeName ?? 'User',
-      priority: _priority,
-      subTasks: subTasks,
-      dueDate: _dueDate,
-      status: TaskStatus.todo,
-    );
-    widget.onSubmit(task);
-  }
-
 }
 
 

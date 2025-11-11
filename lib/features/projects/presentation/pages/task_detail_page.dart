@@ -32,6 +32,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   String _currentUserName = '';
   List<_SubTaskItem> _subTasks = <_SubTaskItem>[];
   bool _isAdmin = false;
+  String? _sprintName;
+  String? _sprintStatus;
 
   @override
   void initState() {
@@ -91,12 +93,41 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         .collection('tasks')
         .doc(widget.task.id)
         .snapshots()
-        .listen((snapshot) {
+        .listen((snapshot) async {
       if (!snapshot.exists || !mounted) return;
       final data = snapshot.data()!;
       print('🔍 [_subscribeToTask] Task data updated - statusName: ${data['statusName']}');
       
+      // Fetch sprint information if task is assigned to a sprint
+      final sprintId = data['sprintId'] as String?;
+      String? sprintName;
+      String? sprintStatus;
+      
+      if (sprintId != null && sprintId.isNotEmpty) {
+        try {
+          final sprintDoc = await FirebaseFirestore.instance
+              .collection('Projects')
+              .doc(widget.projectId)
+              .collection('sprints')
+              .doc(sprintId)
+              .get();
+          
+          if (sprintDoc.exists) {
+            final sprintData = sprintDoc.data();
+            sprintName = sprintData?['name'] as String?;
+            sprintStatus = sprintData?['status'] as String?;
+          }
+        } catch (e) {
+          print('Error fetching sprint: $e');
+        }
+      }
+      
+      if (!mounted) return;
+      
       setState(() {
+        _sprintName = sprintName;
+        _sprintStatus = sprintStatus;
+        
         _task = TaskItem(
           id: widget.task.id,
           title: data['title'] as String? ?? '',
@@ -110,6 +141,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           statusName: data['statusName'] as String?,
           timeSpentMinutes: data['timeSpentMinutes'] as int? ?? 0,
           startedAt: (data['startedAt'] as Timestamp?)?.toDate(),
+          sprintId: sprintId,
+          sprintName: sprintName,
         );
 
         // Parse subtasks (supports legacy list<String> or new list<Map>)
@@ -193,36 +226,48 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
   Future<void> _updateStatus(TaskStatus newStatus) async {
     if (widget.projectId.isEmpty || widget.task.id.isEmpty) return;
+    if (!mounted) return;
     
-    // Optimistic update - update UI immediately without loading spinner
-    setState(() {
-      int newTimeSpent = _task.timeSpentMinutes;
-      DateTime? newStartedAt = _task.startedAt;
+    // Add small delay to avoid Flutter web debug errors
+    await Future.delayed(const Duration(milliseconds: 50));
+    
+    if (!mounted) return;
+    
+    // Defer state update to avoid Flutter web debug errors
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       
-      // Update time tracking
-      if (newStatus == TaskStatus.inProgress && _task.status != TaskStatus.inProgress) {
-        newStartedAt = DateTime.now();
-      } else if (_task.status == TaskStatus.inProgress && newStatus != TaskStatus.inProgress) {
-        if (_task.startedAt != null) {
-          final elapsed = DateTime.now().difference(_task.startedAt!);
-          newTimeSpent = _task.timeSpentMinutes + elapsed.inMinutes;
+      setState(() {
+        int newTimeSpent = _task.timeSpentMinutes;
+        DateTime? newStartedAt = _task.startedAt;
+        
+        // Update time tracking
+        if (newStatus == TaskStatus.inProgress && _task.status != TaskStatus.inProgress) {
+          newStartedAt = DateTime.now();
+        } else if (_task.status == TaskStatus.inProgress && newStatus != TaskStatus.inProgress) {
+          if (_task.startedAt != null) {
+            final elapsed = DateTime.now().difference(_task.startedAt!);
+            newTimeSpent = _task.timeSpentMinutes + elapsed.inMinutes;
+          }
+          newStartedAt = null;
         }
-        newStartedAt = null;
-      }
-      
-      _task = TaskItem(
-      id: _task.id,
-      title: _task.title,
-      description: _task.description,
-      assigneeId: _task.assigneeId,
-      assigneeName: _task.assigneeName,
-      priority: _task.priority,
-      subTasks: _task.subTasks,
-      dueDate: _task.dueDate,
-      status: newStatus,
-        timeSpentMinutes: newTimeSpent,
-        startedAt: newStartedAt,
-      );
+        
+        _task = TaskItem(
+        id: _task.id,
+        title: _task.title,
+        description: _task.description,
+        assigneeId: _task.assigneeId,
+        assigneeName: _task.assigneeName,
+        priority: _task.priority,
+        subTasks: _task.subTasks,
+        dueDate: _task.dueDate,
+        status: newStatus,
+          timeSpentMinutes: newTimeSpent,
+          startedAt: newStartedAt,
+          sprintId: _task.sprintId,
+          sprintName: _task.sprintName,
+        );
+      });
     });
     
     // Update Firebase in the background
@@ -318,37 +363,48 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
               
               // Update directly without triggering subtask logic
               if (widget.projectId.isEmpty || widget.task.id.isEmpty) return;
+              if (!mounted) return;
               
-              // Optimistic UI update
-              setState(() {
-                int newTimeSpent = _task.timeSpentMinutes;
-                DateTime? newStartedAt = _task.startedAt;
+              // Defer UI update to avoid Flutter web debug errors
+              await Future.delayed(const Duration(milliseconds: 50));
+              
+              if (!mounted) return;
+              
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
                 
-                // Update time tracking
-                if (mappedStatus == TaskStatus.inProgress && _task.status != TaskStatus.inProgress) {
-                  newStartedAt = DateTime.now();
-                } else if (_task.status == TaskStatus.inProgress && mappedStatus != TaskStatus.inProgress) {
-                  if (_task.startedAt != null) {
-                    final elapsed = DateTime.now().difference(_task.startedAt!);
-                    newTimeSpent = _task.timeSpentMinutes + elapsed.inMinutes;
+                setState(() {
+                  int newTimeSpent = _task.timeSpentMinutes;
+                  DateTime? newStartedAt = _task.startedAt;
+                  
+                  // Update time tracking
+                  if (mappedStatus == TaskStatus.inProgress && _task.status != TaskStatus.inProgress) {
+                    newStartedAt = DateTime.now();
+                  } else if (_task.status == TaskStatus.inProgress && mappedStatus != TaskStatus.inProgress) {
+                    if (_task.startedAt != null) {
+                      final elapsed = DateTime.now().difference(_task.startedAt!);
+                      newTimeSpent = _task.timeSpentMinutes + elapsed.inMinutes;
+                    }
+                    newStartedAt = null;
                   }
-                  newStartedAt = null;
-                }
-                
-                _task = TaskItem(
-                  id: _task.id,
-                  title: _task.title,
-                  description: _task.description,
-                  assigneeId: _task.assigneeId,
-                  assigneeName: _task.assigneeName,
-                  priority: _task.priority,
-                  subTasks: _task.subTasks,
-                  dueDate: _task.dueDate,
-                  status: mappedStatus,
-                  statusName: status.name, // Save custom status name
-                  timeSpentMinutes: newTimeSpent,
-                  startedAt: newStartedAt,
-                );
+                  
+                  _task = TaskItem(
+                    id: _task.id,
+                    title: _task.title,
+                    description: _task.description,
+                    assigneeId: _task.assigneeId,
+                    assigneeName: _task.assigneeName,
+                    priority: _task.priority,
+                    subTasks: _task.subTasks,
+                    dueDate: _task.dueDate,
+                    status: mappedStatus,
+                    statusName: status.name, // Save custom status name
+                    timeSpentMinutes: newTimeSpent,
+                    startedAt: newStartedAt,
+                    sprintId: _task.sprintId,
+                    sprintName: _task.sprintName,
+                  );
+                });
               });
               
               // Update Firebase with BOTH enum and name
@@ -958,6 +1014,17 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     value: _task.assigneeName,
                   ),
                   const SizedBox(height: 12),
+                  
+                  // Sprint information (if assigned)
+                  if (_sprintName != null && _sprintName!.isNotEmpty) ...[
+                    _SprintDetailRow(
+                      sprintName: _sprintName!,
+                      sprintStatus: _sprintStatus,
+                      isDark: Theme.of(context).brightness == Brightness.dark,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  
                   _DetailRow(
                     icon: Icons.event_outlined,
                     label: 'Due Date',
@@ -1133,6 +1200,128 @@ class _StatusButton extends StatelessWidget {
             color: isSelected ? color : AppPallete.secondary,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SprintDetailRow extends StatelessWidget {
+  const _SprintDetailRow({
+    required this.sprintName,
+    required this.sprintStatus,
+    required this.isDark,
+  });
+
+  final String sprintName;
+  final String? sprintStatus;
+  final bool isDark;
+
+  Color _getSprintStatusColor() {
+    switch (sprintStatus) {
+      case 'active':
+        return const Color(0xFFEC4899); // Pink
+      case 'completed':
+        return const Color(0xFF10B981); // Green
+      case 'planning':
+        return const Color(0xFF3B82F6); // Blue
+      default:
+        return const Color(0xFF8B5CF6); // Purple
+    }
+  }
+
+  String _getSprintStatusLabel() {
+    switch (sprintStatus) {
+      case 'active':
+        return 'Active';
+      case 'completed':
+        return 'Completed';
+      case 'planning':
+        return 'Planning';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return 'Sprint';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = _getSprintStatusColor();
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Theme.of(context).dividerColor, width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.rocket_launch,
+              size: 20,
+              color: Color(0xFF8B5CF6),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                PrimaryText(
+                  text: 'Assigned Sprint',
+                  size: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: PrimaryText(
+                        text: sprintName,
+                        size: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? const Color(0xFFE5E7EB)
+                            : AppPallete.secondary,
+                      ),
+                    ),
+                    if (sprintStatus != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: statusColor.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Text(
+                          _getSprintStatusLabel(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: statusColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
