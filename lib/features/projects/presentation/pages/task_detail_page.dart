@@ -7,7 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:project_pipeline/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:project_pipeline/features/projects/presentation/shared/task_types.dart';
 import 'package:project_pipeline/features/projects/domain/entities/project_entity.dart';
-import 'package:project_pipeline/features/projects/presentation/widgets/edit_task_sheet.dart';
+import 'package:project_pipeline/features/projects/presentation/widgets/edit_task_dialog.dart';
 
 class TaskDetailPage extends StatefulWidget {
   const TaskDetailPage({
@@ -753,48 +753,151 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     });
   }
 
+  Future<void> _showSprintPicker() async {
+    if (widget.project == null || widget.projectId.isEmpty) return;
+    
+    // Fetch available sprints
+    try {
+      final sprintsSnapshot = await FirebaseFirestore.instance
+          .collection('Projects')
+          .doc(widget.projectId)
+          .collection('sprints')
+          .orderBy('startDate', descending: false)
+          .get();
+      
+      final sprints = sprintsSnapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'name': data['name'] as String,
+          'status': data['status'] as String,
+          'startDate': (data['startDate'] as Timestamp).toDate(),
+          'endDate': (data['endDate'] as Timestamp).toDate(),
+        };
+      }).toList();
+      
+      if (!mounted) return;
+      
+      if (sprints.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No sprints available. Create a sprint first.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+      
+      // Show sprint picker
+      await showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (context) => _SprintPickerSheet(
+          sprints: sprints,
+          currentSprintId: _task.sprintId,
+          onSprintSelected: (sprintId, sprintName) async {
+            await _assignToSprint(sprintId, sprintName);
+          },
+          onRemoveSprint: _task.sprintId != null 
+              ? () async {
+                  await _removeFromSprint();
+                }
+              : null,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load sprints: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  Future<void> _assignToSprint(String? sprintId, String? sprintName) async {
+    if (widget.projectId.isEmpty || widget.task.id.isEmpty) return;
+    
+    try {
+      await FirebaseFirestore.instance
+          .collection('Projects')
+          .doc(widget.projectId)
+          .collection('tasks')
+          .doc(widget.task.id)
+          .update({
+        'sprintId': sprintId,
+        'sprintStatus': sprintId != null ? 'committed' : 'backlog',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(sprintId != null 
+                ? '✅ Task assigned to sprint: $sprintName'
+                : '✅ Task removed from sprint'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update sprint: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  Future<void> _removeFromSprint() async {
+    await _assignToSprint(null, null);
+  }
+
   Future<void> _openEditTaskSheet() async {
     if (widget.project == null) return;
     
-    await showModalBottomSheet(
+    await showDialog(
       context: context,
-      backgroundColor: Theme.of(context).dialogBackgroundColor,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(16),
-          topRight: Radius.circular(16),
-        ),
-      ),
+      barrierDismissible: true,
       builder: (context) {
-        final insets = MediaQuery.of(context).viewInsets;
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: 16 + insets.bottom,
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-          child: EditTaskSheet(
-            project: widget.project!,
-            task: _task,
-            onSubmit: ({
-              required String title,
-              required String description,
-              required String assigneeId,
-              required String assigneeName,
-              required TaskPriority priority,
-              required DateTime? dueDate,
-            }) {
-              _updateTaskDetails(
-                title: title,
-                description: description,
-                assigneeId: assigneeId,
-                assigneeName: assigneeName,
-                priority: priority,
-                dueDate: dueDate,
-              );
-            },
+          child: EditTaskDialog(
+          project: widget.project!,
+          projectId: widget.projectId,
+          task: _task,
+          onSubmit: ({
+            required String title,
+            required String description,
+            required String assigneeId,
+            required String assigneeName,
+            required TaskPriority priority,
+            required DateTime? dueDate,
+            String? statusName,
+            TaskStatus? status,
+            String? sprintId,
+          }) {
+            _updateTaskDetails(
+              title: title,
+              description: description,
+              assigneeId: assigneeId,
+              assigneeName: assigneeName,
+              priority: priority,
+              dueDate: dueDate,
+              statusName: statusName,
+              status: status,
+              sprintId: sprintId,
+            );
+          },
           ),
         );
       },
@@ -819,6 +922,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     required String assigneeName,
     required TaskPriority priority,
     required DateTime? dueDate,
+    String? statusName,
+    TaskStatus? status,
+    String? sprintId,
   }) async {
     if (widget.projectId.isEmpty || widget.task.id.isEmpty) return;
     
@@ -839,6 +945,18 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       } else {
         updateData['dueDate'] = FieldValue.delete();
       }
+      
+      // Update status if provided
+      if (status != null) {
+        updateData['status'] = _statusToString(status);
+      }
+      if (statusName != null) {
+        updateData['statusName'] = statusName;
+      }
+      
+      // Update sprint assignment
+      updateData['sprintId'] = sprintId;
+      updateData['sprintStatus'] = sprintId != null ? 'committed' : 'backlog';
 
       await FirebaseFirestore.instance
           .collection('Projects')
@@ -849,7 +967,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Task updated successfully')),
+        const SnackBar(
+          content: Text('✅ Task updated successfully'),
+          backgroundColor: Colors.green,
+        ),
       );
       
       // Update local state optimistically
@@ -863,7 +984,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           priority: priority,
           subTasks: _task.subTasks,
           dueDate: dueDate,
-          status: _task.status,
+          status: status ?? _task.status,
+          statusName: statusName ?? _task.statusName,
           timeSpentMinutes: _task.timeSpentMinutes,
           startedAt: _task.startedAt,
         );
@@ -892,6 +1014,15 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       appBar: AppBar(
         backgroundColor: backgroundColor,
         elevation: 0,
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFFE5E7EB)
+                : AppPallete.secondary,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: PrimaryText(
           text: _task.title,
           size: 20,
@@ -903,7 +1034,12 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         actions: [
           if (_isAdmin)
             IconButton(
-              icon: const Icon(Icons.edit_outlined),
+              icon: Icon(
+                Icons.edit_outlined,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFFE5E7EB)
+                    : AppPallete.secondary,
+              ),
               onPressed: _openEditTaskSheet,
               tooltip: 'Edit Task',
             ),
@@ -1015,15 +1151,23 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   ),
                   const SizedBox(height: 12),
                   
-                  // Sprint information (if assigned)
-                  if (_sprintName != null && _sprintName!.isNotEmpty) ...[
-                    _SprintDetailRow(
-                      sprintName: _sprintName!,
-                      sprintStatus: _sprintStatus,
-                      isDark: Theme.of(context).brightness == Brightness.dark,
-                    ),
-                    const SizedBox(height: 12),
-                  ],
+                  // Sprint information (always show, with option to assign)
+                  InkWell(
+                    onTap: _isAdmin ? () => _showSprintPicker() : null,
+                    borderRadius: BorderRadius.circular(12),
+                    child: _sprintName != null && _sprintName!.isNotEmpty
+                        ? _SprintDetailRow(
+                            sprintName: _sprintName!,
+                            sprintStatus: _sprintStatus,
+                            isDark: Theme.of(context).brightness == Brightness.dark,
+                            isEditable: _isAdmin,
+                          )
+                        : _NotAssignedSprintRow(
+                            isDark: Theme.of(context).brightness == Brightness.dark,
+                            canAssign: _isAdmin,
+                          ),
+                  ),
+                  const SizedBox(height: 12),
                   
                   _DetailRow(
                     icon: Icons.event_outlined,
@@ -1210,11 +1354,13 @@ class _SprintDetailRow extends StatelessWidget {
     required this.sprintName,
     required this.sprintStatus,
     required this.isDark,
+    this.isEditable = false,
   });
 
   final String sprintName;
   final String? sprintStatus;
   final bool isDark;
+  final bool isEditable;
 
   Color _getSprintStatusColor() {
     switch (sprintStatus) {
@@ -1319,6 +1465,363 @@ class _SprintDetailRow extends StatelessWidget {
                   ],
                 ),
               ],
+            ),
+          ),
+          if (isEditable) ...[
+            const SizedBox(width: 8),
+            Icon(
+              Icons.edit_outlined,
+              size: 18,
+              color: isDark ? const Color(0xFF9CA3AF) : AppPallete.textGray,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Not Assigned Sprint Row - Shows when task is not in a sprint
+class _NotAssignedSprintRow extends StatelessWidget {
+  const _NotAssignedSprintRow({
+    required this.isDark,
+    required this.canAssign,
+  });
+
+  final bool isDark;
+  final bool canAssign;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark 
+            ? const Color(0xFF1E1E1E).withOpacity(0.5) 
+            : AppPallete.lightGray.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark 
+              ? const Color(0xFF2D2D2D) 
+              : AppPallete.borderGray,
+          width: 1,
+          style: canAssign ? BorderStyle.solid : BorderStyle.solid,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppPallete.textGray.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.rocket_launch_outlined,
+              size: 20,
+              color: isDark ? const Color(0xFF6B7280) : AppPallete.textGray,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                PrimaryText(
+                  text: 'Sprint',
+                  size: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(height: 2),
+                PrimaryText(
+                  text: 'Not assigned',
+                  size: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? const Color(0xFF6B7280) : AppPallete.textGray,
+                ),
+              ],
+            ),
+          ),
+          if (canAssign) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppPallete.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.add,
+                    size: 14,
+                    color: AppPallete.primary,
+                  ),
+                  const SizedBox(width: 4),
+                  PrimaryText(
+                    text: 'Assign',
+                    size: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppPallete.primary,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Sprint Picker Bottom Sheet
+class _SprintPickerSheet extends StatelessWidget {
+  const _SprintPickerSheet({
+    required this.sprints,
+    required this.currentSprintId,
+    required this.onSprintSelected,
+    this.onRemoveSprint,
+  });
+
+  final List<Map<String, dynamic>> sprints;
+  final String? currentSprintId;
+  final Function(String sprintId, String sprintName) onSprintSelected;
+  final VoidCallback? onRemoveSprint;
+
+  Color _getSprintStatusColor(String status) {
+    switch (status) {
+      case 'active':
+        return const Color(0xFFEC4899);
+      case 'planning':
+        return const Color(0xFF3B82F6);
+      case 'completed':
+        return const Color(0xFF10B981);
+      case 'cancelled':
+        return const Color(0xFFEF4444);
+      default:
+        return const Color(0xFF8B5CF6);
+    }
+  }
+
+  String _getSprintStatusLabel(String status) {
+    switch (status) {
+      case 'active':
+        return 'Active';
+      case 'planning':
+        return 'Planning';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return 'Sprint';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : AppPallete.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF4B5563) : AppPallete.borderGray,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.rocket_launch,
+                  color: AppPallete.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: PrimaryText(
+                    text: 'Assign to Sprint',
+                    size: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFFE5E7EB) : AppPallete.secondary,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                  color: isDark ? const Color(0xFF9CA3AF) : AppPallete.textGray,
+                ),
+              ],
+            ),
+          ),
+          Divider(
+            height: 1,
+            color: isDark ? const Color(0xFF2D2D2D) : AppPallete.borderGray,
+          ),
+          // Sprints list
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(16),
+              itemCount: sprints.length + (onRemoveSprint != null ? 1 : 0),
+              itemBuilder: (context, index) {
+                // Remove from sprint option
+                if (index == sprints.length && onRemoveSprint != null) {
+                  return InkWell(
+                    onTap: () {
+                      Navigator.pop(context);
+                      onRemoveSprint?.call();
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.red.withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.remove_circle_outline,
+                              size: 20,
+                              color: Colors.red,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: PrimaryText(
+                              text: 'Remove from Sprint',
+                              size: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                
+                final sprint = sprints[index];
+                final sprintId = sprint['id'] as String;
+                final sprintName = sprint['name'] as String;
+                final status = sprint['status'] as String;
+                final isSelected = sprintId == currentSprintId;
+                final statusColor = _getSprintStatusColor(status);
+                
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: InkWell(
+                    onTap: () => onSprintSelected(sprintId, sprintName),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppPallete.primary.withOpacity(0.1)
+                            : (isDark ? const Color(0xFF0F0F0F) : AppPallete.white),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppPallete.primary
+                              : (isDark ? const Color(0xFF2D2D2D) : AppPallete.borderGray),
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: statusColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                PrimaryText(
+                                  text: sprintName,
+                                  size: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? const Color(0xFFE5E7EB) : AppPallete.secondary,
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: statusColor.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        _getSprintStatusLabel(status).toUpperCase(),
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w600,
+                                          color: statusColor,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Icon(
+                                      Icons.calendar_today,
+                                      size: 10,
+                                      color: isDark ? const Color(0xFF6B7280) : AppPallete.textGray,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${(sprint['startDate'] as DateTime).day}/${(sprint['startDate'] as DateTime).month} - ${(sprint['endDate'] as DateTime).day}/${(sprint['endDate'] as DateTime).month}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark ? const Color(0xFF6B7280) : AppPallete.textGray,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            const Icon(
+                              Icons.check_circle,
+                              color: AppPallete.primary,
+                              size: 24,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],

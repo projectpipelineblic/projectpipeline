@@ -29,6 +29,9 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
   String? _sprintId;
   int? _storyPoints;
   final List<int> _fibonacciPoints = [1, 2, 3, 5, 8, 13, 21];
+  
+  // Custom status field
+  String? _selectedStatusName;
 
   @override
   void dispose() {
@@ -131,6 +134,45 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
             ],
             onChanged: (v) => setState(() => _priority = v ?? TaskPriority.medium),
           ),
+          const SizedBox(height: 12),
+          // Custom Status Dropdown
+          if (widget.project.customStatuses != null && widget.project.customStatuses!.isNotEmpty)
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Status',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.label_outline),
+              ),
+              value: _selectedStatusName,
+              hint: Text(widget.project.customStatuses!.first.name),
+              items: widget.project.customStatuses!.map((status) {
+                final hexColor = status.colorHex.replaceAll('#', '');
+                final color = Color(int.parse('FF$hexColor', radix: 16));
+                return DropdownMenuItem<String>(
+                  value: status.name,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          status.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (v) => setState(() => _selectedStatusName = v),
+            ),
           const SizedBox(height: 16),
           // Sprint/Scrum Section
           Container(
@@ -153,12 +195,15 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
                       color: const Color(0xFF6366F1),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      'Sprint / Scrum (Optional)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                    Expanded(
+                      child: Text(
+                        'Sprint / Scrum (Optional)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : const Color(0xFF1E293B),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -307,10 +352,25 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
     if (!_formKey.currentState!.validate()) return;
     final subTasks = _subTaskCtrls.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
     
-    // If project has custom statuses, use the first one as default
-    String? defaultStatusName;
-    if (widget.project.customStatuses != null && widget.project.customStatuses!.isNotEmpty) {
-      defaultStatusName = widget.project.customStatuses!.first.name;
+    // Determine status name - use selected, or default to first custom status
+    String? statusName = _selectedStatusName;
+    if (statusName == null && widget.project.customStatuses != null && widget.project.customStatuses!.isNotEmpty) {
+      statusName = widget.project.customStatuses!.first.name;
+    }
+    
+    // Determine status enum based on selected status position
+    TaskStatus status = TaskStatus.todo;
+    if (statusName != null && widget.project.customStatuses != null && widget.project.customStatuses!.isNotEmpty) {
+      final statusIndex = widget.project.customStatuses!.indexWhere((s) => s.name == statusName);
+      if (statusIndex != -1) {
+        if (statusIndex == 0) {
+          status = TaskStatus.todo;
+        } else if (statusIndex == widget.project.customStatuses!.length - 1) {
+          status = TaskStatus.done;
+        } else {
+          status = TaskStatus.inProgress;
+        }
+      }
     }
     
     // Parse estimated hours
@@ -330,8 +390,8 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
       priority: _priority,
       subTasks: subTasks,
       dueDate: _dueDate,
-      status: TaskStatus.todo,
-      statusName: defaultStatusName,
+      status: status,
+      statusName: statusName,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
       // Sprint/Scrum fields

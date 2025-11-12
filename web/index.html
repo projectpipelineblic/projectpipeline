@@ -30,12 +30,16 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Project Pipeline">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-  <!-- Build version for cache busting -->
-  <meta name="version" content="1.0.4-202511101557">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <!-- Build version for cache busting - Update this on each deployment -->
+  <meta name="version" content="1.1.0-20251111">
+  <meta name="build-timestamp" content="">
+  <!-- To update version: Change date to current YYYYMMDD format -->
+  
+  <!-- Aggressive cache prevention -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-
+  
   <!-- Favicon - SVG for modern browsers, PNG fallback -->
   <link rel="icon" type="image/svg+xml" href="app-logo.svg"/>
   <link rel="icon" type="image/png" href="favicon.png"/>
@@ -43,16 +47,58 @@
   <title>Project Pipeline - Task Management</title>
   <link rel="manifest" href="manifest.json">
   
-  <!-- Prevent service worker caching -->
+  <!-- Cache busting and service worker management -->
   <script>
-    // Disable service worker caching for immediate updates
+    // Set build timestamp for cache busting
+    document.querySelector('meta[name="build-timestamp"]').content = Date.now();
+    
+    // Unregister all service workers to prevent caching issues
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
         for(let registration of registrations) {
           registration.unregister();
+          console.log('Service worker unregistered');
         }
       });
     }
+    
+    // Clear all caches
+    if ('caches' in window) {
+      caches.keys().then(function(cacheNames) {
+        return Promise.all(
+          cacheNames.map(function(cacheName) {
+            console.log('Deleting cache:', cacheName);
+            return caches.delete(cacheName);
+          })
+        );
+      }).then(function() {
+        console.log('All caches cleared');
+      });
+    }
+    
+    // Force reload on version change
+    (function checkVersion() {
+      const currentVersion = document.querySelector('meta[name="version"]').content;
+      const storedVersion = localStorage.getItem('app_version');
+      
+      if (storedVersion && storedVersion !== currentVersion) {
+        console.log('New version detected, clearing cache and reloading...');
+        localStorage.setItem('app_version', currentVersion);
+        
+        // Clear everything and force reload
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            for (let name of names) caches.delete(name);
+          }).then(function() {
+            window.location.reload(true);
+          });
+        } else {
+          window.location.reload(true);
+        }
+      } else {
+        localStorage.setItem('app_version', currentVersion);
+      }
+    })();
   </script>
 
   <style>

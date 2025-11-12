@@ -96,7 +96,7 @@ class TaskCardWidget extends StatelessWidget {
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(left: 16, right: 8),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Theme.of(context).cardTheme.color,
           borderRadius: BorderRadius.circular(16),
@@ -151,22 +151,24 @@ class TaskCardWidget extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             PrimaryText(
               text: task.title,
-              size: 18,
+              size: 17,
               fontWeight: FontWeight.bold,
               color: context.colors.secondary,
               maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             PrimaryText(
               text: task.description,
-              size: 14,
+              size: 13,
               color: AppPallete.textGray,
               maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Icon(
@@ -183,71 +185,113 @@ class TaskCardWidget extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            // Status chip
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: _getStatusColor().withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: _getStatusColor().withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(),
-                      shape: BoxShape.circle,
+            const SizedBox(height: 10),
+            // Status chip and Sprint badge
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor().withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _getStatusColor().withOpacity(0.3),
+                      width: 1,
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  PrimaryText(
-                    text: _getStatusLabel(),
-                    size: 11,
-                    fontWeight: FontWeight.w600,
-                    color: _getStatusColor(),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      PrimaryText(
+                        text: _getStatusLabel(),
+                        size: 11,
+                        fontWeight: FontWeight.w600,
+                        color: _getStatusColor(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                // Sprint badge
+                if (task.sprintId != null && task.sprintId!.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFF8B5CF6).withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.rocket_launch,
+                          size: 11,
+                          color: Color(0xFF8B5CF6),
+                        ),
+                        const SizedBox(width: 4),
+                        PrimaryText(
+                          text: task.storyPoints != null 
+                              ? 'Sprint • ${task.storyPoints} SP'
+                              : 'Sprint',
+                          size: 11,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF8B5CF6),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
+            // Assignee info
             Row(
               children: [
                 Icon(
                   Icons.person_outline,
-                  size: 16,
+                  size: 14,
                   color: AppPallete.textGray,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
                 Expanded(
                   child: PrimaryText(
                     text: task.assigneeName,
-                    size: 12,
+                    size: 11,
                     color: AppPallete.textGray,
                     maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
             if (task.subTasks.isNotEmpty) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Icon(
                     Icons.checklist_outlined,
-                    size: 16,
+                    size: 14,
                     color: AppPallete.textGray,
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 4),
                   PrimaryText(
                     text: '${task.subTasks.length} subtask${task.subTasks.length > 1 ? 's' : ''}',
-                    size: 12,
+                    size: 11,
                     color: AppPallete.textGray,
                   ),
                 ],

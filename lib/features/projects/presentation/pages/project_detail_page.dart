@@ -13,6 +13,9 @@ import 'package:project_pipeline/features/projects/presentation/widgets/task_fil
 import 'package:project_pipeline/features_web/projects/widgets/edit_project_dialog.dart';
 import 'package:project_pipeline/features_web/projects/widgets/project_logs_dialog.dart';
 import 'package:project_pipeline/features_web/projects/widgets/web_create_task_dialog.dart';
+import 'package:project_pipeline/features/projects/presentation/widgets/mobile_create_task_dialog.dart';
+import 'package:project_pipeline/core/di/service_locator.dart';
+import 'package:project_pipeline/features/projects/domain/usecases/create_task_usecase.dart';
 import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -496,31 +499,78 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   void _openCreateTaskSheet() {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => WebCreateTaskDialog(
-        project: _project,
-        onSubmit: (task) {
-          // Task is already created in Firestore by the dialog
-          // Just close the dialog and refresh
-          Navigator.of(context).pop();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('✅ Task created successfully'),
-                backgroundColor: Colors.green,
-              ),
+    final isWeb = kIsWeb;
+    
+    if (isWeb) {
+      // Show web dialog
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (context) => WebCreateTaskDialog(
+          project: _project,
+          onSubmit: (task) {
+            // Task is already created in Firestore by the dialog
+            // Just close the dialog and refresh
+            Navigator.of(context).pop();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('✅ Task created successfully'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          },
+        ),
+      ).then((_) {
+        // Refresh tasks after dialog closes
+        if (mounted) {
+          _subscribeTasks();
+        }
+      });
+    } else {
+      // Show mobile dialog
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (context) => MobileCreateTaskDialog(
+          project: _project,
+          onSubmit: (taskEntity) async {
+            // Create task in Firestore
+            final createTask = sl<CreateTask>();
+            final result = await createTask(taskEntity);
+            
+            result.fold(
+              (failure) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to create task: ${failure.message}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              (_) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Task created successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              },
             );
-          }
-        },
-      ),
-    ).then((_) {
-      // Refresh tasks after dialog closes
-      if (mounted) {
-        _subscribeTasks();
-      }
-    });
+          },
+        ),
+      ).then((_) {
+        // Refresh tasks after dialog closes
+        if (mounted) {
+          _subscribeTasks();
+        }
+      });
+    }
   }
 
 

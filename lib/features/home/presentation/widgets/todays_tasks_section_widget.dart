@@ -83,7 +83,7 @@ class _TodaysTasksSectionWidgetState extends State<TodaysTasksSectionWidget> {
         const SizedBox(height: 16),
         if (hasTasks) ...[
           SizedBox(
-            height: 240,
+            height: 300,
             child: PageView.builder(
               itemCount: widget.tasks.length,
               controller: _pageController,
